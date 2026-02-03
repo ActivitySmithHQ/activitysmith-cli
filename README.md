@@ -33,6 +33,18 @@ activitysmith activity start \
   --content-state '{"title":"Deploy","subtitle":"start","numberOfSteps":4,"currentStep":1,"type":"segmented_progress","color":"yellow"}'
 ```
 
+Or use flags:
+
+```bash
+activitysmith activity start \
+  --title "Deploy" \
+  --subtitle "start" \
+  --number-of-steps 4 \
+  --current-step 1 \
+  --type segmented_progress \
+  --color yellow
+```
+
 ### Update Live Activity
 
 ```bash
@@ -41,12 +53,33 @@ activitysmith activity update \
   --content-state '{"title":"Deploy","subtitle":"step 2","currentStep":2}'
 ```
 
+Or use flags:
+
+```bash
+activitysmith activity update \
+  --activity-id "<activityId>" \
+  --title "Deploy" \
+  --subtitle "step 2" \
+  --current-step 2
+```
+
 ### End Live Activity
 
 ```bash
 activitysmith activity end \
   --activity-id "<activityId>" \
   --content-state '{"title":"Deploy","subtitle":"done","currentStep":4,"autoDismissMinutes":3}'
+```
+
+Or use flags:
+
+```bash
+activitysmith activity end \
+  --activity-id "<activityId>" \
+  --title "Deploy" \
+  --subtitle "done" \
+  --current-step 4 \
+  --auto-dismiss-minutes 3
 ```
 
 ### JSON Output
@@ -79,6 +112,12 @@ Or use flags to build the payload:
 - `--color <color>`
 - `--step-color <color>`
 - `--auto-dismiss-minutes <number>`
+
+Required fields:
+
+- `activity start`: `title`, `numberOfSteps`, `currentStep`, `type`
+- `activity update`: `title`, `currentStep`
+- `activity end`: `title`, `currentStep`
 
 ## Output
 
