@@ -1,0 +1,46 @@
+{
+  "name": "activitysmith-cli",
+  "version": "0.1.0",
+  "description": "Command-line interface for ActivitySmith. Send push notifications, start, update and end live activities directly from your terminal.",
+  "keywords": [
+    "activitysmith",
+    "live-activities",
+    "push-notifications",
+    "api",
+    "cli",
+    "deployment",
+    "publishing",
+    "monitoring",
+    "observability",
+    "logging",
+    "logs",
+    "automation",
+    "tracking",
+    "reporting"
+  ],
+  "author": "ActivitySmith",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ActivitySmithHQ/activitysmith-cli.git"
+  },
+  "homepage": "https://activitysmith.com/docs/sdks/cli",
+  "type": "module",
+  "bin": {
+    "activitysmith": "src/cli.js",
+    "activitysmith-cli": "src/cli.js"
+  },
+  "files": [
+    "src"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "lint": "node --check src/cli.js"
+  },
+  "dependencies": {
+    "activitysmith": "0.1.1",
+    "commander": "^12.1.0"
+  }
+}

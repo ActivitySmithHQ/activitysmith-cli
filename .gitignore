@@ -1,0 +1,13 @@
+node_modules/
+.DS_Store
+.env
+.env.*
+*.log
+npm-debug.log*
+*.tgz
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+coverage/
+.nyc_output/
+dist/
