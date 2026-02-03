@@ -18,7 +18,7 @@ Set `ACTIVITYSMITH_API_KEY` or pass `--api-key`.
 activitysmith --help
 ```
 
-### Send Push
+### Send Push Notification
 
 ```bash
 activitysmith push \
@@ -54,7 +54,7 @@ activitysmith activity end \
 ```bash
 activitysmith push --title "Hello" --json
 ```
- 
+
 ## Aliases
 
 The CLI installs two bin names:
