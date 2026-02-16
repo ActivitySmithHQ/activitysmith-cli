@@ -10,7 +10,7 @@ const program = new Command();
 program
   .name("activitysmith-cli")
   .description("CLI for ActivitySmith API")
-  .version("0.1.0")
+  .version("0.1.1")
   .option(
     "--api-key <key>",
     "ActivitySmith API key (defaults to ACTIVITYSMITH_API_KEY)"
@@ -23,6 +23,23 @@ const parseIntegerOption = (label) => (value) => {
     throw new InvalidArgumentError(`${label} must be an integer`);
   }
   return parsed;
+};
+
+const parseChannelsOption = (value) => {
+  if (typeof value !== "string") {
+    throw new InvalidArgumentError("channels must be a comma-separated string");
+  }
+
+  const channels = value
+    .split(",")
+    .map((channel) => channel.trim())
+    .filter((channel) => channel.length > 0);
+
+  if (channels.length === 0) {
+    throw new InvalidArgumentError("channels must contain at least one channel slug");
+  }
+
+  return channels;
 };
 
 const addContentStateOptions = (command, { includeAutoDismiss } = {}) => {
@@ -171,6 +188,19 @@ const toApiContentState = (contentState) => {
 const toApiLiveActivityStartRequest = (contentState) => ({
   content_state: toApiContentState(contentState),
 });
+
+const withTargetChannels = (request, channels) => {
+  if (!channels || channels.length === 0) {
+    return request;
+  }
+
+  return {
+    ...request,
+    target: {
+      channels,
+    },
+  };
+};
 
 const toApiLiveActivityUpdateRequest = (activityId, contentState) => ({
   activity_id: activityId,
@@ -332,6 +362,11 @@ program
   .requiredOption("--title <title>", "Push title")
   .option("--message <message>", "Push message")
   .option("--subtitle <subtitle>", "Push subtitle")
+  .option(
+    "--channels <channels>",
+    "Comma-separated channel slugs (optional)",
+    parseChannelsOption
+  )
   .action(async (options) => {
     const globalOptions = program.opts();
 
@@ -339,12 +374,15 @@ program
       const apiKey = requireApiKey(globalOptions);
       const client = createClient(apiKey);
 
-      const response = await client.notifications.sendPushNotification({
-        pushNotificationRequest: {
+      const response = await client.notifications.send({
+        ...withTargetChannels(
+          {
           title: options.title,
           message: options.message,
           subtitle: options.subtitle,
-        },
+          },
+          options.channels
+        ),
       });
 
       outputResult(response, globalOptions, [
@@ -370,6 +408,11 @@ addContentStateOptions(
   activityCommand
     .command("start")
     .description("Start a Live Activity")
+    .option(
+      "--channels <channels>",
+      "Comma-separated channel slugs (optional)",
+      parseChannelsOption
+    )
     .action(async (options) => {
       const globalOptions = program.opts();
 
@@ -378,9 +421,12 @@ addContentStateOptions(
         const client = createClient(apiKey);
         const contentState = await loadContentState(options);
 
-        const response = await client.liveActivities.startLiveActivity({
-          liveActivityStartRequest: toApiLiveActivityStartRequest(contentState),
-        });
+        const response = await client.liveActivities.start(
+          withTargetChannels(
+            toApiLiveActivityStartRequest(contentState),
+            options.channels
+          )
+        );
 
         const activityId = response?.activityId ?? response?.activity_id;
         outputResult(response, globalOptions, [

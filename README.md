@@ -23,14 +23,16 @@ activitysmith --help
 ```bash
 activitysmith push \
   --title "Build Failed" \
-  --message "CI pipeline failed on main branch"
+  --message "CI pipeline failed on main branch" \
+  --channels "devs,ops"
 ```
 
 ### Start Live Activity
 
 ```bash
 activitysmith activity start \
-  --content-state '{"title":"Deploy","subtitle":"start","numberOfSteps":4,"currentStep":1,"type":"segmented_progress","color":"yellow"}'
+  --content-state '{"title":"Deploy","subtitle":"start","numberOfSteps":4,"currentStep":1,"type":"segmented_progress","color":"yellow"}' \
+  --channels "devs,ops"
 ```
 
 Or use flags:
@@ -42,7 +44,8 @@ activitysmith activity start \
   --number-of-steps 4 \
   --current-step 1 \
   --type segmented_progress \
-  --color yellow
+  --color yellow \
+  --channels "devs,ops"
 ```
 
 ### Update Live Activity
@@ -112,6 +115,10 @@ Or use flags to build the payload:
 - `--color <color>`
 - `--step-color <color>`
 - `--auto-dismiss-minutes <number>`
+
+Targeting options:
+
+- `--channels <comma-separated-slugs>` (for `push` and `activity start`)
 
 Required fields:
 
