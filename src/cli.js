@@ -452,12 +452,12 @@ addContentStateOptions(
         const client = createClient(apiKey);
         const contentState = await loadContentState(options);
 
-        const response = await client.liveActivities.updateLiveActivity({
-          liveActivityUpdateRequest: toApiLiveActivityUpdateRequest(
+        const response = await client.liveActivities.update(
+          toApiLiveActivityUpdateRequest(
             options.activityId,
             contentState
-          ),
-        });
+          )
+        );
 
         outputResult(response, globalOptions, [
           "Live Activity updated.",
@@ -482,12 +482,12 @@ addContentStateOptions(
         const client = createClient(apiKey);
         const contentState = await loadContentState(options);
 
-        const response = await client.liveActivities.endLiveActivity({
-          liveActivityEndRequest: toApiLiveActivityEndRequest(
+        const response = await client.liveActivities.end(
+          toApiLiveActivityEndRequest(
             options.activityId,
             contentState
-          ),
-        });
+          )
+        );
 
         outputResult(response, globalOptions, [
           "Live Activity ended.",
