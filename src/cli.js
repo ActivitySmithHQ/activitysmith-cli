@@ -2,15 +2,19 @@
 
 import { Command, InvalidArgumentError } from "commander";
 import ActivitySmith from "activitysmith";
+import { createRequire } from "module";
 import { readFile } from "fs/promises";
 import { resolve } from "path";
+
+const require = createRequire(import.meta.url);
+const { version } = require("../package.json");
 
 const program = new Command();
 
 program
   .name("activitysmith-cli")
   .description("CLI for ActivitySmith API")
-  .version("0.1.1")
+  .version(version)
   .option(
     "--api-key <key>",
     "ActivitySmith API key (defaults to ACTIVITYSMITH_API_KEY)"
@@ -374,12 +378,12 @@ program
       const apiKey = requireApiKey(globalOptions);
       const client = createClient(apiKey);
 
-      const response = await client.notifications.send({
-        ...withTargetChannels(
+      const response = await client.notifications.sendPushNotification({
+        pushNotificationRequest: withTargetChannels(
           {
-          title: options.title,
-          message: options.message,
-          subtitle: options.subtitle,
+            title: options.title,
+            message: options.message,
+            subtitle: options.subtitle,
           },
           options.channels
         ),
