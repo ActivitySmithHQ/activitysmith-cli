@@ -425,12 +425,12 @@ addContentStateOptions(
         const client = createClient(apiKey);
         const contentState = await loadContentState(options);
 
-        const response = await client.liveActivities.start(
-          withTargetChannels(
+        const response = await client.liveActivities.startLiveActivity({
+          liveActivityStartRequest: withTargetChannels(
             toApiLiveActivityStartRequest(contentState),
             options.channels
-          )
-        );
+          ),
+        });
 
         const activityId = response?.activityId ?? response?.activity_id;
         outputResult(response, globalOptions, [
@@ -456,12 +456,12 @@ addContentStateOptions(
         const client = createClient(apiKey);
         const contentState = await loadContentState(options);
 
-        const response = await client.liveActivities.update(
-          toApiLiveActivityUpdateRequest(
+        const response = await client.liveActivities.updateLiveActivity({
+          liveActivityUpdateRequest: toApiLiveActivityUpdateRequest(
             options.activityId,
             contentState
-          )
-        );
+          ),
+        });
 
         outputResult(response, globalOptions, [
           "Live Activity updated.",
@@ -486,12 +486,12 @@ addContentStateOptions(
         const client = createClient(apiKey);
         const contentState = await loadContentState(options);
 
-        const response = await client.liveActivities.end(
-          toApiLiveActivityEndRequest(
+        const response = await client.liveActivities.endLiveActivity({
+          liveActivityEndRequest: toApiLiveActivityEndRequest(
             options.activityId,
             contentState
-          )
-        );
+          ),
+        });
 
         outputResult(response, globalOptions, [
           "Live Activity ended.",
