@@ -8,9 +8,27 @@ CLI wrapper for the ActivitySmith API using the official Node SDK.
 npm install -g activitysmith-cli
 ```
 
+## Install Skill (Codex/Claude/Other Skills-Compatible Agents)
+
+Install the public skill from this repo:
+
+```bash
+npx skills add ActivitySmithHQ/activitysmith-cli --skill activitysmith
+```
+
+Skill path in this repo:
+
+```text
+skills/activitysmith
+```
+
+The skill is agent-neutral and uses `ACTIVITYSMITH_API_KEY` auth plus the same CLI commands shown below.
+
 ## Auth
 
 Set `ACTIVITYSMITH_API_KEY` or pass `--api-key`.
+
+For the skill scripts, you can also copy `skills/activitysmith/.env.example` to `skills/activitysmith/.env`.
 
 ## Usage
 
