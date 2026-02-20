@@ -1,4 +1,4 @@
 interface:
   display_name: "ActivitySmith"
-  short_description: "Send ActivitySmith push notifications and manage Live Activities"
+  short_description: "Send ActivitySmith push notifications and trigger Live Activities"
   default_prompt: "Use ActivitySmith CLI to send push notifications and run live activity start/update/end with API key auth."

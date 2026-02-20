@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
   cat <<'USAGE'
-Usage: start_activity.sh -t "title" --type "type" --steps <n> --current <n> [-s "subtitle"] [-c "channels"] [--color "color"] [--step-color "color"]
+Usage: start_activity.sh -t "title" --type "type" --steps <n> --current <n> [-s "subtitle"] [-c "channels"] [--color "color"] [--step-color "color"] [--id-only]
 
 Required:
   -t, --title       Live Activity title
@@ -16,6 +16,7 @@ Optional:
   -c, --channels    Comma-separated channel slugs
   --color           Accent color
   --step-color      Step color
+  --id-only         Print only the Activity ID from command output
 USAGE
 }
 
@@ -27,6 +28,7 @@ steps=""
 current=""
 color=""
 step_color=""
+id_only="false"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -38,6 +40,7 @@ while [[ $# -gt 0 ]]; do
     --current) current="$2"; shift 2 ;;
     --color) color="$2"; shift 2 ;;
     --step-color) step_color="$2"; shift 2 ;;
+    --id-only) id_only="true"; shift 1 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown option: $1"; usage; exit 1 ;;
   esac
@@ -76,4 +79,17 @@ if [[ -n "$step_color" ]]; then
   cmd+=(--step-color "$step_color")
 fi
 
-run_activitysmith "${cmd[@]}"
+output="$(run_activitysmith "${cmd[@]}")"
+
+if [[ "$id_only" == "true" ]]; then
+  activity_id="$(printf '%s\n' "$output" | sed -n 's/^Activity ID: //p' | head -n1)"
+  if [[ -z "$activity_id" ]]; then
+    echo "Could not parse Activity ID from start_activity.sh output." >&2
+    echo "$output" >&2
+    exit 1
+  fi
+  printf '%s\n' "$activity_id"
+  exit 0
+fi
+
+printf '%s\n' "$output"
