@@ -40,8 +40,8 @@ activitysmith --help
 
 ```bash
 activitysmith push \
-  --title "Build Failed" \
-  --message "CI pipeline failed on main branch" \
+  --title "New subscription 💸" \
+  --message "Customer upgraded to Pro plan" \
   --channels "devs,ops"
 ```
 
@@ -49,7 +49,7 @@ activitysmith push \
 
 ```bash
 activitysmith activity start \
-  --content-state '{"title":"Deploy","subtitle":"start","numberOfSteps":4,"currentStep":1,"type":"segmented_progress","color":"yellow"}' \
+  --content-state '{"title":"Nightly database backup","subtitle":"create snapshot","numberOfSteps":3,"currentStep":1,"type":"segmented_progress","color":"yellow"}' \
   --channels "devs,ops"
 ```
 
@@ -57,9 +57,9 @@ Or use flags:
 
 ```bash
 activitysmith activity start \
-  --title "Deploy" \
-  --subtitle "start" \
-  --number-of-steps 4 \
+  --title "Nightly database backup" \
+  --subtitle "create snapshot" \
+  --number-of-steps 3 \
   --current-step 1 \
   --type segmented_progress \
   --color yellow \
@@ -71,7 +71,7 @@ activitysmith activity start \
 ```bash
 activitysmith activity update \
   --activity-id "<activityId>" \
-  --content-state '{"title":"Deploy","subtitle":"step 2","currentStep":2}'
+  --content-state '{"title":"Nightly database backup","subtitle":"upload archive","currentStep":2}'
 ```
 
 Or use flags:
@@ -79,8 +79,8 @@ Or use flags:
 ```bash
 activitysmith activity update \
   --activity-id "<activityId>" \
-  --title "Deploy" \
-  --subtitle "step 2" \
+  --title "Nightly database backup" \
+  --subtitle "upload archive" \
   --current-step 2
 ```
 
@@ -89,7 +89,7 @@ activitysmith activity update \
 ```bash
 activitysmith activity end \
   --activity-id "<activityId>" \
-  --content-state '{"title":"Deploy","subtitle":"done","currentStep":4,"autoDismissMinutes":3}'
+  --content-state '{"title":"Nightly database backup","subtitle":"verify restore","currentStep":3,"autoDismissMinutes":2}'
 ```
 
 Or use flags:
@@ -97,10 +97,10 @@ Or use flags:
 ```bash
 activitysmith activity end \
   --activity-id "<activityId>" \
-  --title "Deploy" \
-  --subtitle "done" \
-  --current-step 4 \
-  --auto-dismiss-minutes 3
+  --title "Nightly database backup" \
+  --subtitle "verify restore" \
+  --current-step 3 \
+  --auto-dismiss-minutes 2
 ```
 
 ### JSON Output
