@@ -79,12 +79,23 @@ if [[ -n "$step_color" ]]; then
   cmd+=(--step-color "$step_color")
 fi
 
-output="$(run_activitysmith "${cmd[@]}")"
-
 if [[ "$id_only" == "true" ]]; then
-  activity_id="$(printf '%s\n' "$output" | sed -n 's/^Activity ID: //p' | head -n1)"
+  output="$(run_activitysmith --json "${cmd[@]}")"
+  activity_id="$(
+    printf '%s\n' "$output" | node -e '
+      const fs = require("fs");
+      const input = fs.readFileSync(0, "utf8");
+      try {
+        const parsed = JSON.parse(input);
+        const id = parsed?.activityId ?? parsed?.activity_id ?? "";
+        if (typeof id === "string" && id.length > 0) {
+          process.stdout.write(id);
+        }
+      } catch {}
+    '
+  )"
   if [[ -z "$activity_id" ]]; then
-    echo "Could not parse Activity ID from start_activity.sh output." >&2
+    echo "Could not parse Activity ID from JSON output." >&2
     echo "$output" >&2
     exit 1
   fi
@@ -92,4 +103,5 @@ if [[ "$id_only" == "true" ]]; then
   exit 0
 fi
 
+output="$(run_activitysmith "${cmd[@]}")"
 printf '%s\n' "$output"
