@@ -46,6 +46,25 @@ const parseChannelsOption = (value) => {
   return channels;
 };
 
+const normalizeHttpsUrl = (value, label) => {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error(`${label} must be a non-empty string`);
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(value.trim());
+  } catch {
+    throw new Error(`${label} must be a valid URL`);
+  }
+
+  if (parsed.protocol !== "https:") {
+    throw new Error(`${label} must use https`);
+  }
+
+  return parsed.toString();
+};
+
 const addContentStateOptions = (command, { includeAutoDismiss } = {}) => {
   command
     .option("--content-state <json>", "Content state as JSON string")
@@ -127,6 +146,109 @@ const readJsonFile = async (filePath, label) => {
     }
     throw error;
   }
+};
+
+const parseJsonArrayString = (value, label) => {
+  let parsed;
+  try {
+    parsed = JSON.parse(value);
+  } catch {
+    throw new Error(`${label} must be valid JSON`);
+  }
+
+  if (!Array.isArray(parsed)) {
+    throw new Error(`${label} must be a JSON array`);
+  }
+
+  return parsed;
+};
+
+const readJsonArrayFile = async (filePath, label) => {
+  const resolvedPath = resolve(process.cwd(), filePath);
+  let text = "";
+
+  try {
+    text = await readFile(resolvedPath, "utf8");
+  } catch {
+    throw new Error(`${label} could not be read at ${resolvedPath}`);
+  }
+
+  return parseJsonArrayString(text, label);
+};
+
+const parsePushAction = (value, index) => {
+  const label = `actions[${index}]`;
+  assertPlainObject(value, label);
+
+  if (typeof value.title !== "string" || value.title.trim().length === 0) {
+    throw new Error(`${label}.title is required`);
+  }
+
+  if (typeof value.type !== "string") {
+    throw new Error(`${label}.type is required`);
+  }
+
+  const normalizedType = value.type.trim();
+  if (normalizedType !== "open_url" && normalizedType !== "webhook") {
+    throw new Error(`${label}.type must be one of: open_url, webhook`);
+  }
+
+  const action = {
+    title: value.title.trim(),
+    type: normalizedType,
+    url: normalizeHttpsUrl(value.url, `${label}.url`),
+  };
+
+  if (value.method !== undefined) {
+    if (typeof value.method !== "string") {
+      throw new Error(`${label}.method must be a string`);
+    }
+    const normalizedMethod = value.method.trim().toUpperCase();
+    if (normalizedMethod !== "GET" && normalizedMethod !== "POST") {
+      throw new Error(`${label}.method must be one of: GET, POST`);
+    }
+    action.method = normalizedMethod;
+  }
+
+  if (value.body !== undefined) {
+    assertPlainObject(value.body, `${label}.body`);
+    action.body = value.body;
+  }
+
+  if (normalizedType === "open_url" && (value.method !== undefined || value.body !== undefined)) {
+    throw new Error(`${label} with type=open_url cannot include method or body`);
+  }
+
+  return action;
+};
+
+const loadPushActions = async (options) => {
+  if (options.actions && options.actionsFile) {
+    throw new Error("Provide either --actions or --actions-file, not both.");
+  }
+
+  let actions;
+  if (options.actionsFile) {
+    actions = await readJsonArrayFile(options.actionsFile, "actions-file");
+  }
+
+  if (options.actions) {
+    actions = parseJsonArrayString(options.actions, "actions");
+  }
+
+  if (actions === undefined) {
+    return undefined;
+  }
+
+  if (actions.length === 0) {
+    throw new Error("actions must contain at least one action");
+  }
+
+  if (actions.length > 4) {
+    throw new Error("actions can contain at most 4 actions");
+  }
+
+  return actions.map(parsePushAction);
 };
 
 const buildContentStateFromOptions = (options) => {
@@ -366,6 +488,9 @@ program
   .requiredOption("--title <title>", "Push title")
   .option("--message <message>", "Push message")
   .option("--subtitle <subtitle>", "Push subtitle")
+  .option("--redirection <url>", "HTTPS URL opened when notification is tapped")
+  .option("--actions <json>", "Actions JSON array (max 4)")
+  .option("--actions-file <path>", "Path to actions JSON array file")
   .option(
     "--channels <channels>",
     "Comma-separated channel slugs (optional)",
@@ -377,16 +502,24 @@ program
     try {
       const apiKey = requireApiKey(globalOptions);
       const client = createClient(apiKey);
+      const actions = await loadPushActions(options);
+
+      const pushNotificationRequest = withTargetChannels(
+        {
+          title: options.title,
+          message: options.message,
+          subtitle: options.subtitle,
+          redirection:
+            options.redirection !== undefined
+              ? normalizeHttpsUrl(options.redirection, "redirection")
+              : undefined,
+          actions,
+        },
+        options.channels
+      );
 
       const response = await client.notifications.sendPushNotification({
-        pushNotificationRequest: withTargetChannels(
-          {
-            title: options.title,
-            message: options.message,
-            subtitle: options.subtitle,
-          },
-          options.channels
-        ),
+        pushNotificationRequest,
       });
 
       outputResult(response, globalOptions, [

@@ -40,9 +40,8 @@ activitysmith --help
 
 ```bash
 activitysmith push \
-  --title "Build Failed" \
-  --message "CI pipeline failed on main branch" \
-  --channels "devs,ops"
+  --title "Build Failed 🚨" \
+  --message "CI pipeline failed on main branch"
 ```
 
 ### Start Live Activity
@@ -101,6 +100,39 @@ activitysmith activity end \
   --subtitle "done" \
   --current-step 4 \
   --auto-dismiss-minutes 3
+```
+
+### Channels
+
+Channels are used to target specific team members or devices. Can be used for both push notifications and live activities.
+
+```bash
+activitysmith push \
+  --title "Build Failed 🚨" \
+  --message "CI pipeline failed on main branch" \
+  --channels "devs,ops"
+```
+
+### Push Notification Redirection and Actions
+
+Push notification redirection and actions are optional and can be used to redirect the user to a specific URL when they tap the notification or to trigger a specific action when they long-press the notification.
+Webhooks are executed by ActivitySmith backend.
+
+```bash
+activitysmith push \
+  --title "Build Failed 🚨" \
+  --message "CI pipeline failed on main branch" \
+  --redirection "https://github.com/org/repo/actions/runs/123456789" \
+  --actions '[{"title":"Open Failing Run","type":"open_url","url":"https://github.com/org/repo/actions/runs/123456789"},{"title":"Create Incident","type":"webhook","url":"https://hooks.example.com/incidents/create","method":"POST","body":{"service":"payments-api","severity":"high","source":"activitysmith-cli"}}]'
+```
+
+You can also load actions from a file:
+
+```bash
+activitysmith push \
+  --title "Build Failed 🚨" \
+  --message "CI pipeline failed on main branch" \
+  --actions-file "./actions.json"
 ```
 
 ### JSON Output

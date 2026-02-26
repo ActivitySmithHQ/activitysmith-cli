@@ -40,7 +40,7 @@
     "lint": "node --check src/cli.js"
   },
   "dependencies": {
-    "activitysmith": "0.1.1",
+    "activitysmith": "^0.1.5",
     "commander": "^12.1.0"
   }
 }
