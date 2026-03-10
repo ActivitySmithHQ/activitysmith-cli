@@ -199,6 +199,132 @@ const readJsonArrayFile = async (filePath, label) => {
   return parseJsonArrayString(text, label);
 };
 
+const isNonEmptyString = (value) =>
+  typeof value === "string" && value.trim().length > 0;
+
+const hasOwn = (object, key) =>
+  Object.prototype.hasOwnProperty.call(object, key);
+
+const validateContentState = (contentState, mode) => {
+  const normalizedType =
+    typeof contentState.type === "string" ? contentState.type.trim() : undefined;
+
+  if (!isNonEmptyString(contentState.title)) {
+    throw new Error("contentState.title is required");
+  }
+
+  if (
+    normalizedType !== undefined &&
+    normalizedType !== "segmented_progress" &&
+    normalizedType !== "progress"
+  ) {
+    throw new Error(
+      "contentState.type must be one of: segmented_progress, progress"
+    );
+  }
+
+  const hasNumberOfSteps = hasOwn(contentState, "numberOfSteps");
+  const hasCurrentStep = hasOwn(contentState, "currentStep");
+  const hasPercentage = hasOwn(contentState, "percentage");
+  const hasValue = hasOwn(contentState, "value");
+  const hasUpperLimit = hasOwn(contentState, "upperLimit");
+  const hasStepColor = hasOwn(contentState, "stepColor");
+
+  if (hasValue !== hasUpperLimit) {
+    throw new Error(
+      "contentState.value and contentState.upperLimit must be provided together"
+    );
+  }
+
+  if (hasNumberOfSteps && contentState.numberOfSteps < 1) {
+    throw new Error("contentState.numberOfSteps must be at least 1");
+  }
+
+  if (hasCurrentStep && contentState.currentStep < 1) {
+    throw new Error("contentState.currentStep must be at least 1");
+  }
+
+  if (
+    hasPercentage &&
+    (contentState.percentage < 0 || contentState.percentage > 100)
+  ) {
+    throw new Error("contentState.percentage must be between 0 and 100");
+  }
+
+  if (hasUpperLimit && contentState.upperLimit <= 0) {
+    throw new Error("contentState.upperLimit must be greater than 0");
+  }
+
+  const hasSegmentedFields = hasNumberOfSteps || hasCurrentStep || hasStepColor;
+  const hasProgressFields = hasPercentage || hasValue || hasUpperLimit;
+
+  if (hasSegmentedFields && hasProgressFields) {
+    throw new Error(
+      "Do not mix segmented_progress fields with progress fields in the same contentState"
+    );
+  }
+
+  const effectiveType = normalizedType;
+
+  if (mode === "start") {
+    if (!effectiveType) {
+      throw new Error("contentState.type is required for activity start");
+    }
+
+    if (effectiveType === "segmented_progress") {
+      if (!hasNumberOfSteps || !hasCurrentStep) {
+        throw new Error(
+          "segmented_progress start requires contentState.numberOfSteps and contentState.currentStep"
+        );
+      }
+      return;
+    }
+
+    if (!hasPercentage && !hasValue) {
+      throw new Error(
+        "progress start requires contentState.percentage, or contentState.value with contentState.upperLimit"
+      );
+    }
+    return;
+  }
+
+  if (effectiveType === "segmented_progress") {
+    if (!hasCurrentStep) {
+      throw new Error(
+        `segmented_progress ${mode} requires contentState.currentStep`
+      );
+    }
+    return;
+  }
+
+  if (effectiveType === "progress") {
+    if (!hasPercentage && !hasValue) {
+      throw new Error(
+        `progress ${mode} requires contentState.percentage, or contentState.value with contentState.upperLimit`
+      );
+    }
+    return;
+  }
+
+  if (!hasSegmentedFields && !hasProgressFields) {
+    throw new Error(
+      `contentState for activity ${mode} must include either segmented_progress fields or progress fields`
+    );
+  }
+
+  if (hasSegmentedFields && !hasCurrentStep) {
+    throw new Error(
+      `segmented_progress ${mode} requires contentState.currentStep`
+    );
+  }
+
+  if (hasProgressFields && !hasPercentage && !hasValue) {
+    throw new Error(
+      `progress ${mode} requires contentState.percentage, or contentState.value with contentState.upperLimit`
+    );
+  }
+};
+
 const parsePushAction = (value, index) => {
   const label = `actions[${index}]`;
   assertPlainObject(value, label);
@@ -374,7 +500,7 @@ const toApiLiveActivityEndRequest = (activityId, contentState) => ({
   content_state: toApiContentState(contentState),
 });
 
-const loadContentState = async (options) => {
+const loadContentState = async (options, mode) => {
   let contentState = {};
 
   if (options.contentStateFile) {
@@ -401,6 +527,8 @@ const loadContentState = async (options) => {
       "contentState is required. Provide --content-state, --content-state-file, or field flags."
     );
   }
+
+  validateContentState(contentState, mode);
 
   return contentState;
 };
@@ -592,7 +720,7 @@ addContentStateOptions(
       try {
         const apiKey = requireApiKey(globalOptions);
         const client = createClient(apiKey);
-        const contentState = await loadContentState(options);
+        const contentState = await loadContentState(options, "start");
 
         const response = await client.liveActivities.startLiveActivity({
           liveActivityStartRequest: withTargetChannels(
@@ -623,7 +751,7 @@ addContentStateOptions(
       try {
         const apiKey = requireApiKey(globalOptions);
         const client = createClient(apiKey);
-        const contentState = await loadContentState(options);
+        const contentState = await loadContentState(options, "update");
 
         const response = await client.liveActivities.updateLiveActivity({
           liveActivityUpdateRequest: toApiLiveActivityUpdateRequest(
@@ -653,7 +781,7 @@ addContentStateOptions(
       try {
         const apiKey = requireApiKey(globalOptions);
         const client = createClient(apiKey);
-        const contentState = await loadContentState(options);
+        const contentState = await loadContentState(options, "end");
 
         const response = await client.liveActivities.endLiveActivity({
           liveActivityEndRequest: toApiLiveActivityEndRequest(

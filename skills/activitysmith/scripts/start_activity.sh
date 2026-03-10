@@ -3,19 +3,24 @@ set -euo pipefail
 
 usage() {
   cat <<'USAGE'
-Usage: start_activity.sh -t "title" --type "type" --steps <n> --current <n> [-s "subtitle"] [-c "channels"] [--color "color"] [--step-color "color"] [--id-only]
+Usage:
+  start_activity.sh -t "title" --type "segmented_progress" --steps <n> --current <n> [-s "subtitle"] [-c "channels"] [--color "color"] [--step-color "color"] [--id-only]
+  start_activity.sh -t "title" --type "progress" [--percentage <n> | --value <n> --upper-limit <n>] [-s "subtitle"] [-c "channels"] [--color "color"] [--id-only]
 
 Required:
   -t, --title       Live Activity title
-  --type            Content state type (e.g. segmented_progress)
-  --steps           Number of steps
-  --current         Current step
+  --type            Content state type: segmented_progress or progress
 
 Optional:
+  --steps           Number of steps (segmented_progress)
+  --current         Current step (segmented_progress)
+  --percentage      Percentage progress (progress)
+  --value           Current value (progress; use with --upper-limit)
+  --upper-limit     Maximum value (progress; use with --value)
   -s, --subtitle    Subtitle
   -c, --channels    Comma-separated channel slugs
   --color           Accent color
-  --step-color      Step color
+  --step-color      Step color (segmented_progress)
   --id-only         Print only the Activity ID from command output
 USAGE
 }
@@ -26,6 +31,9 @@ channels=""
 type=""
 steps=""
 current=""
+percentage=""
+value=""
+upper_limit=""
 color=""
 step_color=""
 id_only="false"
@@ -38,6 +46,9 @@ while [[ $# -gt 0 ]]; do
     --type) type="$2"; shift 2 ;;
     --steps) steps="$2"; shift 2 ;;
     --current) current="$2"; shift 2 ;;
+    --percentage) percentage="$2"; shift 2 ;;
+    --value) value="$2"; shift 2 ;;
+    --upper-limit) upper_limit="$2"; shift 2 ;;
     --color) color="$2"; shift 2 ;;
     --step-color) step_color="$2"; shift 2 ;;
     --id-only) id_only="true"; shift 1 ;;
@@ -46,8 +57,41 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$title" || -z "$type" || -z "$steps" || -z "$current" ]]; then
+if [[ -z "$title" || -z "$type" ]]; then
   echo "Missing required options."
+  usage
+  exit 1
+fi
+
+if [[ "$type" == "segmented_progress" ]]; then
+  if [[ -z "$steps" || -z "$current" ]]; then
+    echo "segmented_progress requires --steps and --current."
+    usage
+    exit 1
+  fi
+  if [[ -n "$percentage" || -n "$value" || -n "$upper_limit" ]]; then
+    echo "Do not mix progress fields with segmented_progress."
+    usage
+    exit 1
+  fi
+elif [[ "$type" == "progress" ]]; then
+  if [[ -n "$steps" || -n "$current" || -n "$step_color" ]]; then
+    echo "Do not mix segmented_progress fields with progress."
+    usage
+    exit 1
+  fi
+  if [[ -n "$percentage" && ( -n "$value" || -n "$upper_limit" ) ]]; then
+    echo "Use either --percentage or --value with --upper-limit."
+    usage
+    exit 1
+  fi
+  if [[ -z "$percentage" && ( -z "$value" || -z "$upper_limit" ) ]]; then
+    echo "progress requires --percentage, or --value with --upper-limit."
+    usage
+    exit 1
+  fi
+else
+  echo "--type must be segmented_progress or progress."
   usage
   exit 1
 fi
@@ -62,9 +106,23 @@ cmd=(
   activity start
   --title "$title"
   --type "$type"
-  --number-of-steps "$steps"
-  --current-step "$current"
 )
+
+if [[ -n "$steps" ]]; then
+  cmd+=(--number-of-steps "$steps")
+fi
+if [[ -n "$current" ]]; then
+  cmd+=(--current-step "$current")
+fi
+if [[ -n "$percentage" ]]; then
+  cmd+=(--percentage "$percentage")
+fi
+if [[ -n "$value" ]]; then
+  cmd+=(--value "$value")
+fi
+if [[ -n "$upper_limit" ]]; then
+  cmd+=(--upper-limit "$upper_limit")
+fi
 
 if [[ -n "$subtitle" ]]; then
   cmd+=(--subtitle "$subtitle")

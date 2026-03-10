@@ -1,4 +1,4 @@
 interface:
   display_name: "ActivitySmith"
-  short_description: "Send push notifications and run full Live Activity lifecycle via ActivitySmith CLI"
-  default_prompt: "Use ActivitySmith scripts to send push notifications (including optional channels/redirection/actions) and to run start/update/end live activity lifecycle with ACTIVITYSMITH_API_KEY auth."
+  short_description: "Send push notifications and run segmented_progress or progress Live Activity lifecycle via ActivitySmith CLI"
+  default_prompt: "Use ActivitySmith scripts to send push notifications (including optional channels/redirection/actions) and to run start/update/end Live Activity lifecycle for segmented_progress or progress types with ACTIVITYSMITH_API_KEY auth."
