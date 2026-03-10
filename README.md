@@ -44,62 +44,108 @@ activitysmith push \
   --message "CI pipeline failed on main branch"
 ```
 
-### Start Live Activity
+## Live Activities
+
+Live Activities come in two UI types, but the lifecycle stays the same:
+start the activity, keep the returned `activity_id`, update it as state
+changes, then end it when the work is done.
+
+- `segmented_progress`: best for jobs tracked in steps
+- `progress`: best for jobs tracked as a percentage or numeric range
+
+### Shared flow
+
+1. Run `activitysmith activity start ...`.
+2. Save the returned `activity_id`.
+3. Run `activitysmith activity update ...` as progress changes.
+4. Run `activitysmith activity end ...` when the work is finished.
+
+You can use `--content-state <json>` for the examples below, or build the same
+payload with flags as documented in `Content State Options`.
+
+### Segmented Progress Type
+
+Use `segmented_progress` when progress is easier to follow as steps instead of a
+raw percentage. It fits jobs like deployments, backups, ETL pipelines, and
+checklists where "step 2 of 3" is more useful than "67%".
+`numberOfSteps` is dynamic, so you can increase or decrease it later if the
+workflow changes.
+
+#### Start
+
+<p align="center">
+  <img src="https://cdn.activitysmith.com/features/start-live-activity.png" alt="Segmented progress start example" width="680" />
+</p>
 
 ```bash
 activitysmith activity start \
-  --content-state '{"title":"Deploy","subtitle":"start","numberOfSteps":4,"currentStep":1,"type":"segmented_progress","color":"yellow"}' \
+  --content-state '{"title":"Nightly database backup","subtitle":"create snapshot","numberOfSteps":3,"currentStep":1,"type":"segmented_progress","color":"yellow"}' \
   --channels "devs,ops"
 ```
 
-Or use flags:
+#### Update
 
-```bash
-activitysmith activity start \
-  --title "Deploy" \
-  --subtitle "start" \
-  --number-of-steps 4 \
-  --current-step 1 \
-  --type segmented_progress \
-  --color yellow \
-  --channels "devs,ops"
-```
-
-### Update Live Activity
+<p align="center">
+  <img src="https://cdn.activitysmith.com/features/update-live-activity.png" alt="Segmented progress update example" width="680" />
+</p>
 
 ```bash
 activitysmith activity update \
   --activity-id "<activityId>" \
-  --content-state '{"title":"Deploy","subtitle":"step 2","currentStep":2}'
+  --content-state '{"title":"Nightly database backup","subtitle":"upload archive","numberOfSteps":4,"currentStep":2}'
 ```
 
-Or use flags:
+#### End
+
+<p align="center">
+  <img src="https://cdn.activitysmith.com/features/end-live-activity.png" alt="Segmented progress end example" width="680" />
+</p>
+
+```bash
+activitysmith activity end \
+  --activity-id "<activityId>" \
+  --content-state '{"title":"Nightly database backup","subtitle":"verify restore","numberOfSteps":4,"currentStep":4,"autoDismissMinutes":2}'
+```
+
+### Progress Type
+
+Use `progress` when the state is naturally continuous. It fits charging,
+downloads, sync jobs, uploads, timers, and any flow where a percentage or
+numeric range is the clearest signal.
+
+#### Start
+
+<p align="center">
+  <img src="https://cdn.activitysmith.com/features/progress-live-activity-start.png" alt="Progress start example" width="680" />
+</p>
+
+```bash
+activitysmith activity start \
+  --content-state '{"title":"EV Charging","subtitle":"Added 30 mi range","percentage":15,"type":"progress","color":"lime"}'
+```
+
+#### Update
+
+<p align="center">
+  <img src="https://cdn.activitysmith.com/features/progress-live-activity-update.png" alt="Progress update example" width="680" />
+</p>
 
 ```bash
 activitysmith activity update \
   --activity-id "<activityId>" \
-  --title "Deploy" \
-  --subtitle "step 2" \
-  --current-step 2
+  --content-state '{"title":"EV Charging","subtitle":"Added 120 mi range","percentage":60}'
 ```
 
-### End Live Activity
+#### End
+
+<p align="center">
+  <img src="https://cdn.activitysmith.com/features/progress-live-activity-end.png" alt="Progress end example" width="680" />
+</p>
 
 ```bash
 activitysmith activity end \
   --activity-id "<activityId>" \
-  --content-state '{"title":"Deploy","subtitle":"done","currentStep":4,"autoDismissMinutes":3}'
-```
-
-Or use flags:
-
-```bash
-activitysmith activity end \
-  --activity-id "<activityId>" \
-  --title "Deploy" \
-  --subtitle "done" \
-  --current-step 4 \
-  --auto-dismiss-minutes 3
+  --content-state '{"title":"EV Charging","subtitle":"Added 200 mi range","percentage":100,"autoDismissMinutes":2}'
 ```
 
 ### Channels
@@ -172,9 +218,9 @@ Targeting options:
 
 Required fields:
 
-- `activity start`: `title`, `numberOfSteps`, `currentStep`, `type`
-- `activity update`: `title`, `currentStep`
-- `activity end`: `title`, `currentStep`
+- `activity start`: `title`, `type`, plus either `numberOfSteps` and `currentStep`, or `percentage`, or `value` with `upperLimit`
+- `activity update`: `title`, plus either `currentStep`, or `percentage`, or `value` with `upperLimit`
+- `activity end`: `title`, plus either `currentStep`, or `percentage`, or `value` with `upperLimit`
 
 ## Output
 
