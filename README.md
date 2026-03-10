@@ -208,6 +208,9 @@ Or use flags to build the payload:
 - `--type <type>`
 - `--number-of-steps <number>`
 - `--current-step <number>`
+- `--percentage <number>`
+- `--value <number>`
+- `--upper-limit <number>`
 - `--color <color>`
 - `--step-color <color>`
 - `--auto-dismiss-minutes <number>`
@@ -218,9 +221,9 @@ Targeting options:
 
 Required fields:
 
-- `activity start`: `title`, `type`, plus either `numberOfSteps` and `currentStep`, or `percentage`, or `value` with `upperLimit`
-- `activity update`: `title`, plus either `currentStep`, or `percentage`, or `value` with `upperLimit`
-- `activity end`: `title`, plus either `currentStep`, or `percentage`, or `value` with `upperLimit`
+- `activity start`: `--title`, `--type`, plus either `--number-of-steps` and `--current-step`, or `--percentage`, or `--value` with `--upper-limit`
+- `activity update`: `--title`, plus either `--current-step`, or `--percentage`, or `--value` with `--upper-limit`
+- `activity end`: `--title`, plus either `--current-step`, or `--percentage`, or `--value` with `--upper-limit`
 
 ## Output
 

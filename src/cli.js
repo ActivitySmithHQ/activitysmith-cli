@@ -29,6 +29,14 @@ const parseIntegerOption = (label) => (value) => {
   return parsed;
 };
 
+const parseNumberOption = (label) => (value) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    throw new InvalidArgumentError(`${label} must be a number`);
+  }
+  return parsed;
+};
+
 const parseChannelsOption = (value) => {
   if (typeof value !== "string") {
     throw new InvalidArgumentError("channels must be a comma-separated string");
@@ -81,6 +89,21 @@ const addContentStateOptions = (command, { includeAutoDismiss } = {}) => {
       "--current-step <number>",
       "Content state current step",
       parseIntegerOption("current-step")
+    )
+    .option(
+      "--percentage <number>",
+      "Content state percentage",
+      parseNumberOption("percentage")
+    )
+    .option(
+      "--value <number>",
+      "Content state value",
+      parseNumberOption("value")
+    )
+    .option(
+      "--upper-limit <number>",
+      "Content state upper limit",
+      parseNumberOption("upper-limit")
     )
     .option("--color <color>", "Content state color")
     .option("--step-color <color>", "Content state step color");
@@ -274,6 +297,18 @@ const buildContentStateFromOptions = (options) => {
     contentState.currentStep = options.currentStep;
   }
 
+  if (options.percentage !== undefined) {
+    contentState.percentage = options.percentage;
+  }
+
+  if (options.value !== undefined) {
+    contentState.value = options.value;
+  }
+
+  if (options.upperLimit !== undefined) {
+    contentState.upperLimit = options.upperLimit;
+  }
+
   if (options.color !== undefined) {
     contentState.color = options.color;
   }
@@ -293,6 +328,7 @@ const toApiContentState = (contentState) => {
   const keyMap = {
     numberOfSteps: "number_of_steps",
     currentStep: "current_step",
+    upperLimit: "upper_limit",
     stepColor: "step_color",
     autoDismissMinutes: "auto_dismiss_minutes",
   };
