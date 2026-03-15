@@ -34,7 +34,7 @@
     "src"
   ],
   "engines": {
-    "node": ">=18"
+    "node": ">=24"
   },
   "scripts": {
     "lint": "node --check src/cli.js"
