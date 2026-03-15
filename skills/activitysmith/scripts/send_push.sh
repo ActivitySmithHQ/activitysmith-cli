@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
   cat <<'USAGE'
-Usage: send_push.sh -m "message" [-t "title"] [-s "subtitle"] [-c "channels"] [-r "redirection"] [-a "actions-json"] [-A "actions-file"]
+Usage: send_push.sh -m "message" [-t "title"] [-s "subtitle"] [-c "channels"] [-M "media"] [-r "redirection"] [-a "actions-json"] [-A "actions-file"]
 
 Required:
   -m  Push message
@@ -12,6 +12,7 @@ Optional:
   -t  Push title (default: "ActivitySmith update")
   -s  Push subtitle
   -c  Comma-separated channel slugs (example: "devs,ops")
+  -M  Rich media HTTPS URL (image, audio, or video)
   -r  Redirection HTTPS URL (opened on notification tap)
   -a  Actions JSON array string (max 4 actions)
   -A  Path to actions JSON array file
@@ -22,16 +23,18 @@ message=""
 title="ActivitySmith update"
 subtitle=""
 channels=""
+media=""
 redirection=""
 actions_json=""
 actions_file=""
 
-while getopts ":m:t:s:c:r:a:A:h" opt; do
+while getopts ":m:t:s:c:M:r:a:A:h" opt; do
   case "$opt" in
     m) message="$OPTARG" ;;
     t) title="$OPTARG" ;;
     s) subtitle="$OPTARG" ;;
     c) channels="$OPTARG" ;;
+    M) media="$OPTARG" ;;
     r) redirection="$OPTARG" ;;
     a) actions_json="$OPTARG" ;;
     A) actions_file="$OPTARG" ;;
@@ -53,6 +56,12 @@ if [[ -n "$actions_json" && -n "$actions_file" ]]; then
   exit 1
 fi
 
+if [[ -n "$media" && ( -n "$actions_json" || -n "$actions_file" ) ]]; then
+  echo "Media cannot be combined with actions."
+  usage
+  exit 1
+fi
+
 # shellcheck disable=SC1091
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 load_env_if_present
@@ -65,6 +74,9 @@ if [[ -n "$subtitle" ]]; then
 fi
 if [[ -n "$channels" ]]; then
   cmd+=(--channels "$channels")
+fi
+if [[ -n "$media" ]]; then
+  cmd+=(--media "$media")
 fi
 if [[ -n "$redirection" ]]; then
   cmd+=(--redirection "$redirection")

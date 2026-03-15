@@ -15,7 +15,7 @@ Use this skill to send push notifications and run Live Activity lifecycle comman
 ## Intent to Command Map
 
 - Send push notification:
-  `./skills/activitysmith/scripts/send_push.sh -m "..." [-t "..."] [-s "..."] [-c "..."] [-r "https://..."] [-a '[...]' | -A /path/actions.json]`
+  `./skills/activitysmith/scripts/send_push.sh -m "..." [-t "..."] [-s "..."] [-c "..."] [-M "https://..."] [-r "https://..."] [-a '[...]' | -A /path/actions.json]`
 - Start Live Activity:
   - segmented: `./skills/activitysmith/scripts/start_activity.sh --title "..." --type "segmented_progress" --steps N --current N [--subtitle "..."] [--color "..."] [--step-color "..."] [-c "..."] [--id-only]`
   - progress: `./skills/activitysmith/scripts/start_activity.sh --title "..." --type "progress" [--subtitle "..."] [--percentage N | --value N --upper-limit N] [--color "..."] [-c "..."] [--id-only]`
@@ -30,10 +30,15 @@ Use this skill to send push notifications and run Live Activity lifecycle comman
 
 - Minimal push: `title` + `message`.
 - Optional targeting: `-c "channel-a,channel-b"`.
+- Optional rich media: `-M "https://..."`.
 - Optional tap redirection: `-r "https://..."`.
 - Optional long-press actions:
   - inline JSON: `-a '[{"title":"...","type":"open_url","url":"https://..."}]'`
   - file JSON: `-A ./actions.json`
+- Media constraints:
+  - `media` must be `https://`
+  - `media` can be combined with redirection
+  - never combine `media` with actions
 - Actions constraints:
   - max 4 actions
   - each action requires `title`, `type`, `url`
@@ -81,6 +86,16 @@ Push with redirection and actions:
   -m "CI pipeline failed on main branch" \
   -r "https://github.com/org/repo/actions/runs/123456789" \
   -a '[{"title":"Open Failing Run","type":"open_url","url":"https://github.com/org/repo/actions/runs/123456789"},{"title":"Create Incident","type":"webhook","url":"https://hooks.example.com/incidents/create","method":"POST","body":{"service":"payments-api","severity":"high"}}]'
+```
+
+Rich push with media:
+
+```bash
+./skills/activitysmith/scripts/send_push.sh \
+  -t "Homepage ready" \
+  -m "Your agent finished the redesign." \
+  -M "https://cdn.example.com/output/homepage-v2.png" \
+  -r "https://github.com/acme/web/pull/482"
 ```
 
 Live Activity lifecycle:

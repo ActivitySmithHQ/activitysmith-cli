@@ -400,6 +400,16 @@ const loadPushActions = async (options) => {
   return actions.map(parsePushAction);
 };
 
+const validatePushMediaOptions = ({ media, actions }) => {
+  if (media === undefined || actions === undefined) {
+    return;
+  }
+
+  if (actions.length > 0) {
+    throw new Error("media cannot be combined with actions");
+  }
+};
+
 const buildContentStateFromOptions = (options) => {
   const contentState = {};
 
@@ -652,6 +662,10 @@ program
   .requiredOption("--title <title>", "Push title")
   .option("--message <message>", "Push message")
   .option("--subtitle <subtitle>", "Push subtitle")
+  .option(
+    "--media <url>",
+    "HTTPS URL for image, audio, or video shown when the notification is expanded"
+  )
   .option("--redirection <url>", "HTTPS URL opened when notification is tapped")
   .option("--actions <json>", "Actions JSON array (max 4)")
   .option("--actions-file <path>", "Path to actions JSON array file")
@@ -667,12 +681,20 @@ program
       const apiKey = requireApiKey(globalOptions);
       const client = createClient(apiKey);
       const actions = await loadPushActions(options);
+      validatePushMediaOptions({
+        media: options.media,
+        actions,
+      });
 
       const pushNotificationRequest = withTargetChannels(
         {
           title: options.title,
           message: options.message,
           subtitle: options.subtitle,
+          media:
+            options.media !== undefined
+              ? normalizeHttpsUrl(options.media, "media")
+              : undefined,
           redirection:
             options.redirection !== undefined
               ? normalizeHttpsUrl(options.redirection, "redirection")
