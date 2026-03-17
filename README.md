@@ -188,10 +188,14 @@ What will work:
 
 `--media` can be combined with `--redirection`, but not with `--actions` or `--actions-file`.
 
-### Push Notification Redirection and Actions
+### Actionable Push Notifications
 
-Push notification redirection and actions are optional and can be used to redirect the user to a specific URL when they tap the notification or to trigger a specific action when they long-press the notification.
-Webhooks are executed by ActivitySmith backend.
+<p align="center">
+  <img src="https://cdn.activitysmith.com/features/actionable-push-notifications-2.png" alt="Actionable push notification example" width="680" />
+</p>
+
+Actionable push notifications can open a URL on tap or trigger actions when someone long-presses the notification.
+Webhooks are executed by the ActivitySmith backend.
 
 ```bash
 activitysmith push \
