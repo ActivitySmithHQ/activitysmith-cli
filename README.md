@@ -30,11 +30,9 @@ Set `ACTIVITYSMITH_API_KEY` or pass `--api-key`.
 
 For the skill scripts, you can also copy `skills/activitysmith/.env.example` to `skills/activitysmith/.env`.
 
-## Usage
+## Push Notifications
 
-```bash
-activitysmith --help
-```
+Run `activitysmith --help` to inspect available commands.
 
 ### Send Push Notification
 
@@ -42,6 +40,61 @@ activitysmith --help
 activitysmith push \
   --title "Build Failed 🚨" \
   --message "CI pipeline failed on main branch"
+```
+
+### Rich Push Notifications with Media
+
+<p align="center">
+  <img src="https://cdn.activitysmith.com/features/rich-push-notification-with-image.png" alt="Rich push notification with image" width="680" />
+</p>
+
+```bash
+activitysmith push \
+  --title "Homepage ready" \
+  --message "Your agent finished the redesign." \
+  --media "https://cdn.example.com/output/homepage-v2.png" \
+  --redirection "https://github.com/acme/web/pull/482"
+```
+
+Send images, videos, or audio with your push notifications, press and hold to preview media directly from the notification, then tap through to open the linked content.
+
+<p align="center">
+  <img src="https://cdn.activitysmith.com/features/rich-push-notification-with-audio.png" alt="Rich push notification with audio" width="680" />
+</p>
+
+What will work:
+
+- direct image URL: `.jpg`, `.png`, `.gif`, etc.
+- direct audio file URL: `.mp3`, `.m4a`, etc.
+- direct video file URL: `.mp4`, `.mov`, etc.
+- URL that responds with a proper media `Content-Type`, even if the path has no extension
+
+`--media` can be combined with `--redirection`, but not with `--actions` or `--actions-file`.
+
+### Actionable Push Notifications
+
+<p align="center">
+  <img src="https://cdn.activitysmith.com/features/actionable-push-notifications-2.png" alt="Actionable push notification example" width="680" />
+</p>
+
+Actionable push notifications can open a URL on tap or trigger actions when someone long-presses the notification.
+Webhooks are executed by the ActivitySmith backend.
+
+```bash
+activitysmith push \
+  --title "Build Failed 🚨" \
+  --message "CI pipeline failed on main branch" \
+  --redirection "https://github.com/org/repo/actions/runs/123456789" \
+  --actions '[{"title":"Open Failing Run","type":"open_url","url":"https://github.com/org/repo/actions/runs/123456789"},{"title":"Create Incident","type":"webhook","url":"https://hooks.example.com/incidents/create","method":"POST","body":{"service":"payments-api","severity":"high","source":"activitysmith-cli"}}]'
+```
+
+You can also load actions from a file:
+
+```bash
+activitysmith push \
+  --title "Build Failed 🚨" \
+  --message "CI pipeline failed on main branch" \
+  --actions-file "./actions.json"
 ```
 
 ## Live Activities
@@ -148,7 +201,7 @@ activitysmith activity end \
   --content-state '{"title":"EV Charging","subtitle":"Added 200 mi range","percentage":100,"autoDismissMinutes":2}'
 ```
 
-### Channels
+## Channels
 
 Channels are used to target specific team members or devices. Can be used for both push notifications and live activities.
 
@@ -157,67 +210,6 @@ activitysmith push \
   --title "Build Failed 🚨" \
   --message "CI pipeline failed on main branch" \
   --channels "devs,ops"
-```
-
-### Rich Push Notifications with Media
-
-<p align="center">
-  <img src="https://cdn.activitysmith.com/features/rich-push-notification-with-image.png" alt="Rich push notification with image" width="680" />
-</p>
-
-```bash
-activitysmith push \
-  --title "Homepage ready" \
-  --message "Your agent finished the redesign." \
-  --media "https://cdn.example.com/output/homepage-v2.png" \
-  --redirection "https://github.com/acme/web/pull/482"
-```
-
-Send images, videos, or audio with your push notifications, press and hold to preview media directly from the notification, then tap through to open the linked content.
-
-<p align="center">
-  <img src="https://cdn.activitysmith.com/features/rich-push-notification-with-audio.png" alt="Rich push notification with audio" width="680" />
-</p>
-
-What will work:
-
-- direct image URL: `.jpg`, `.png`, `.gif`, etc.
-- direct audio file URL: `.mp3`, `.m4a`, etc.
-- direct video file URL: `.mp4`, `.mov`, etc.
-- URL that responds with a proper media `Content-Type`, even if the path has no extension
-
-`--media` can be combined with `--redirection`, but not with `--actions` or `--actions-file`.
-
-### Actionable Push Notifications
-
-<p align="center">
-  <img src="https://cdn.activitysmith.com/features/actionable-push-notifications-2.png" alt="Actionable push notification example" width="680" />
-</p>
-
-Actionable push notifications can open a URL on tap or trigger actions when someone long-presses the notification.
-Webhooks are executed by the ActivitySmith backend.
-
-```bash
-activitysmith push \
-  --title "Build Failed 🚨" \
-  --message "CI pipeline failed on main branch" \
-  --redirection "https://github.com/org/repo/actions/runs/123456789" \
-  --actions '[{"title":"Open Failing Run","type":"open_url","url":"https://github.com/org/repo/actions/runs/123456789"},{"title":"Create Incident","type":"webhook","url":"https://hooks.example.com/incidents/create","method":"POST","body":{"service":"payments-api","severity":"high","source":"activitysmith-cli"}}]'
-```
-
-You can also load actions from a file:
-
-```bash
-activitysmith push \
-  --title "Build Failed 🚨" \
-  --message "CI pipeline failed on main branch" \
-  --actions-file "./actions.json"
-```
-
-### JSON Output
-
-```bash
-activitysmith push --title "Hello" --json
 ```
 
 ## Aliases
@@ -261,3 +253,7 @@ Required fields:
 ## Output
 
 Use `--json` for machine-readable output.
+
+```bash
+activitysmith push --title "Hello" --json
+```
