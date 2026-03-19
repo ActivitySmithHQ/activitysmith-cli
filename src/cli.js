@@ -119,6 +119,11 @@ const addContentStateOptions = (command, { includeAutoDismiss } = {}) => {
   return command;
 };
 
+const addLiveActivityActionOptions = (command) =>
+  command
+    .option("--action <json>", "Live Activity action as JSON object")
+    .option("--action-file <path>", "Live Activity action JSON file path");
+
 const getApiKey = (options) =>
   options.apiKey || process.env.ACTIVITYSMITH_API_KEY;
 
@@ -325,8 +330,7 @@ const validateContentState = (contentState, mode) => {
   }
 };
 
-const parsePushAction = (value, index) => {
-  const label = `actions[${index}]`;
+const parseAction = (value, label) => {
   assertPlainObject(value, label);
 
   if (typeof value.title !== "string" || value.title.trim().length === 0) {
@@ -371,6 +375,8 @@ const parsePushAction = (value, index) => {
   return action;
 };
 
+const parsePushAction = (value, index) => parseAction(value, `actions[${index}]`);
+
 const loadPushActions = async (options) => {
   if (options.actions && options.actionsFile) {
     throw new Error("Provide either --actions or --actions-file, not both.");
@@ -398,6 +404,27 @@ const loadPushActions = async (options) => {
   }
 
   return actions.map(parsePushAction);
+};
+
+const loadLiveActivityAction = async (options) => {
+  if (options.action && options.actionFile) {
+    throw new Error("Provide either --action or --action-file, not both.");
+  }
+
+  let action;
+  if (options.actionFile) {
+    action = await readJsonFile(options.actionFile, "action-file");
+  }
+
+  if (options.action) {
+    action = parseJsonString(options.action, "action");
+  }
+
+  if (action === undefined) {
+    return undefined;
+  }
+
+  return parseAction(action, "action");
 };
 
 const validatePushMediaOptions = ({ media, actions }) => {
@@ -483,9 +510,17 @@ const toApiContentState = (contentState) => {
   return mapped;
 };
 
-const toApiLiveActivityStartRequest = (contentState) => ({
-  content_state: toApiContentState(contentState),
-});
+const toApiLiveActivityStartRequest = (contentState, action) => {
+  const request = {
+    content_state: toApiContentState(contentState),
+  };
+
+  if (action !== undefined) {
+    request.action = action;
+  }
+
+  return request;
+};
 
 const withTargetChannels = (request, channels) => {
   if (!channels || channels.length === 0) {
@@ -500,15 +535,31 @@ const withTargetChannels = (request, channels) => {
   };
 };
 
-const toApiLiveActivityUpdateRequest = (activityId, contentState) => ({
-  activity_id: activityId,
-  content_state: toApiContentState(contentState),
-});
+const toApiLiveActivityUpdateRequest = (activityId, contentState, action) => {
+  const request = {
+    activity_id: activityId,
+    content_state: toApiContentState(contentState),
+  };
 
-const toApiLiveActivityEndRequest = (activityId, contentState) => ({
-  activity_id: activityId,
-  content_state: toApiContentState(contentState),
-});
+  if (action !== undefined) {
+    request.action = action;
+  }
+
+  return request;
+};
+
+const toApiLiveActivityEndRequest = (activityId, contentState, action) => {
+  const request = {
+    activity_id: activityId,
+    content_state: toApiContentState(contentState),
+  };
+
+  if (action !== undefined) {
+    request.action = action;
+  }
+
+  return request;
+};
 
 const loadContentState = async (options, mode) => {
   let contentState = {};
@@ -727,7 +778,7 @@ const activityCommand = program
   .command("activity")
   .description("Manage Live Activities");
 
-addContentStateOptions(
+addLiveActivityActionOptions(addContentStateOptions(
   activityCommand
     .command("start")
     .description("Start a Live Activity")
@@ -743,10 +794,11 @@ addContentStateOptions(
         const apiKey = requireApiKey(globalOptions);
         const client = createClient(apiKey);
         const contentState = await loadContentState(options, "start");
+        const action = await loadLiveActivityAction(options);
 
         const response = await client.liveActivities.startLiveActivity({
           liveActivityStartRequest: withTargetChannels(
-            toApiLiveActivityStartRequest(contentState),
+            toApiLiveActivityStartRequest(contentState, action),
             options.channels
           ),
         });
@@ -760,9 +812,9 @@ addContentStateOptions(
         await handleError(error, globalOptions);
       }
     })
-);
+));
 
-addContentStateOptions(
+addLiveActivityActionOptions(addContentStateOptions(
   activityCommand
     .command("update")
     .description("Update a Live Activity")
@@ -774,11 +826,13 @@ addContentStateOptions(
         const apiKey = requireApiKey(globalOptions);
         const client = createClient(apiKey);
         const contentState = await loadContentState(options, "update");
+        const action = await loadLiveActivityAction(options);
 
         const response = await client.liveActivities.updateLiveActivity({
           liveActivityUpdateRequest: toApiLiveActivityUpdateRequest(
             options.activityId,
-            contentState
+            contentState,
+            action
           ),
         });
 
@@ -790,9 +844,9 @@ addContentStateOptions(
         await handleError(error, globalOptions);
       }
     })
-);
+));
 
-addContentStateOptions(
+addLiveActivityActionOptions(addContentStateOptions(
   activityCommand
     .command("end")
     .description("End a Live Activity")
@@ -804,11 +858,13 @@ addContentStateOptions(
         const apiKey = requireApiKey(globalOptions);
         const client = createClient(apiKey);
         const contentState = await loadContentState(options, "end");
+        const action = await loadLiveActivityAction(options);
 
         const response = await client.liveActivities.endLiveActivity({
           liveActivityEndRequest: toApiLiveActivityEndRequest(
             options.activityId,
-            contentState
+            contentState,
+            action
           ),
         });
 
@@ -821,7 +877,7 @@ addContentStateOptions(
       }
     }),
   { includeAutoDismiss: true }
-);
+));
 
 program.showHelpAfterError(true);
 program.parseAsync(process.argv);

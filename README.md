@@ -201,6 +201,31 @@ activitysmith activity end \
   --content-state '{"title":"EV Charging","subtitle":"Added 200 mi range","percentage":100,"autoDismissMinutes":2}'
 ```
 
+### Live Activity Action
+
+Just like Actionable Push Notifications, Live Activities can have a button that opens provided URL in a browser or triggers a webhook. Webhooks are executed by the ActivitySmith backend.
+
+<p align="center">
+  <img src="https://cdn.activitysmith.com/features/live-activity-with-action.png?v=20260319-1" alt="Live Activity with action" width="680" />
+</p>
+
+#### Open URL action
+
+```bash
+activitysmith activity start \
+  --content-state '{"title":"Deploying payments-api","subtitle":"Running database migrations","numberOfSteps":5,"currentStep":3,"type":"segmented_progress"}' \
+  --action '{"title":"Open Workflow","type":"open_url","url":"https://github.com/acme/payments-api/actions/runs/1234567890"}'
+```
+
+#### Webhook action
+
+```bash
+activitysmith activity update \
+  --activity-id "<activityId>" \
+  --content-state '{"title":"Reindexing product search","subtitle":"Shard 7 of 12","numberOfSteps":12,"currentStep":7}' \
+  --action '{"title":"Pause Reindex","type":"webhook","url":"https://ops.example.com/hooks/search/reindex/pause","method":"POST","body":{"job_id":"reindex-2026-03-19","requested_by":"activitysmith-cli"}}'
+```
+
 ## Channels
 
 Channels are used to target specific team members or devices. Can be used for both push notifications and live activities.
@@ -239,6 +264,11 @@ Or use flags to build the payload:
 - `--color <color>`
 - `--step-color <color>`
 - `--auto-dismiss-minutes <number>`
+
+Live Activity action options:
+
+- `--action <json>`
+- `--action-file <path>`
 
 Targeting options:
 

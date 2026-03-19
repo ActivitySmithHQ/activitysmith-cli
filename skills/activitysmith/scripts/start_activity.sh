@@ -4,8 +4,8 @@ set -euo pipefail
 usage() {
   cat <<'USAGE'
 Usage:
-  start_activity.sh -t "title" --type "segmented_progress" --steps <n> --current <n> [-s "subtitle"] [-c "channels"] [--color "color"] [--step-color "color"] [--id-only]
-  start_activity.sh -t "title" --type "progress" [--percentage <n> | --value <n> --upper-limit <n>] [-s "subtitle"] [-c "channels"] [--color "color"] [--id-only]
+  start_activity.sh -t "title" --type "segmented_progress" --steps <n> --current <n> [-s "subtitle"] [-c "channels"] [--color "color"] [--step-color "color"] [--action '<json>' | --action-file /path/action.json] [--id-only]
+  start_activity.sh -t "title" --type "progress" [--percentage <n> | --value <n> --upper-limit <n>] [-s "subtitle"] [-c "channels"] [--color "color"] [--action '<json>' | --action-file /path/action.json] [--id-only]
 
 Required:
   -t, --title       Live Activity title
@@ -21,6 +21,8 @@ Optional:
   -c, --channels    Comma-separated channel slugs
   --color           Accent color
   --step-color      Step color (segmented_progress)
+  --action          Live Activity action JSON object
+  --action-file     Path to Live Activity action JSON file
   --id-only         Print only the Activity ID from command output
 USAGE
 }
@@ -36,6 +38,8 @@ value=""
 upper_limit=""
 color=""
 step_color=""
+action_json=""
+action_file=""
 id_only="false"
 
 while [[ $# -gt 0 ]]; do
@@ -51,6 +55,8 @@ while [[ $# -gt 0 ]]; do
     --upper-limit) upper_limit="$2"; shift 2 ;;
     --color) color="$2"; shift 2 ;;
     --step-color) step_color="$2"; shift 2 ;;
+    --action) action_json="$2"; shift 2 ;;
+    --action-file) action_file="$2"; shift 2 ;;
     --id-only) id_only="true"; shift 1 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown option: $1"; usage; exit 1 ;;
@@ -59,6 +65,11 @@ done
 
 if [[ -z "$title" || -z "$type" ]]; then
   echo "Missing required options."
+  usage
+  exit 1
+fi
+if [[ -n "$action_json" && -n "$action_file" ]]; then
+  echo "Provide either --action or --action-file, not both."
   usage
   exit 1
 fi
@@ -135,6 +146,12 @@ if [[ -n "$color" ]]; then
 fi
 if [[ -n "$step_color" ]]; then
   cmd+=(--step-color "$step_color")
+fi
+if [[ -n "$action_json" ]]; then
+  cmd+=(--action "$action_json")
+fi
+if [[ -n "$action_file" ]]; then
+  cmd+=(--action-file "$action_file")
 fi
 
 if [[ "$id_only" == "true" ]]; then

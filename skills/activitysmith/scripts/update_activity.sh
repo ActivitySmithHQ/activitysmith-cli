@@ -4,8 +4,8 @@ set -euo pipefail
 usage() {
   cat <<'USAGE'
 Usage:
-  update_activity.sh -a "activity_id" -t "title" --current <n> [--type "segmented_progress"] [--steps <n>] [-s "subtitle"] [--color "color"] [--step-color "color"]
-  update_activity.sh -a "activity_id" -t "title" [--type "progress"] [--percentage <n> | --value <n> --upper-limit <n>] [-s "subtitle"] [--color "color"]
+  update_activity.sh -a "activity_id" -t "title" --current <n> [--type "segmented_progress"] [--steps <n>] [-s "subtitle"] [--color "color"] [--step-color "color"] [--action '<json>' | --action-file /path/action.json]
+  update_activity.sh -a "activity_id" -t "title" [--type "progress"] [--percentage <n> | --value <n> --upper-limit <n>] [-s "subtitle"] [--color "color"] [--action '<json>' | --action-file /path/action.json]
 
 Required:
   -a, --activity-id  Activity ID returned by start_activity.sh
@@ -21,6 +21,8 @@ Optional:
   -s, --subtitle     Subtitle
   --color            Accent color
   --step-color       Step color (segmented_progress)
+  --action           Live Activity action JSON object
+  --action-file      Path to Live Activity action JSON file
 USAGE
 }
 
@@ -35,6 +37,8 @@ value=""
 upper_limit=""
 color=""
 step_color=""
+action_json=""
+action_file=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -49,6 +53,8 @@ while [[ $# -gt 0 ]]; do
     --upper-limit) upper_limit="$2"; shift 2 ;;
     --color) color="$2"; shift 2 ;;
     --step-color) step_color="$2"; shift 2 ;;
+    --action) action_json="$2"; shift 2 ;;
+    --action-file) action_file="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown option: $1"; usage; exit 1 ;;
   esac
@@ -56,6 +62,11 @@ done
 
 if [[ -z "$activity_id" || -z "$title" ]]; then
   echo "Missing required options."
+  usage
+  exit 1
+fi
+if [[ -n "$action_json" && -n "$action_file" ]]; then
+  echo "Provide either --action or --action-file, not both."
   usage
   exit 1
 fi
@@ -146,6 +157,12 @@ if [[ -n "$color" ]]; then
 fi
 if [[ -n "$step_color" ]]; then
   cmd+=(--step-color "$step_color")
+fi
+if [[ -n "$action_json" ]]; then
+  cmd+=(--action "$action_json")
+fi
+if [[ -n "$action_file" ]]; then
+  cmd+=(--action-file "$action_file")
 fi
 
 run_activitysmith "${cmd[@]}"

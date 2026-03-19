@@ -1,6 +1,6 @@
 {
   "name": "activitysmith-cli",
-  "version": "0.1.8",
+  "version": "1.0.0",
   "description": "Command-line interface for ActivitySmith. Send push notifications, start, update and end live activities directly from your terminal.",
   "keywords": [
     "activitysmith",
@@ -40,7 +40,7 @@
     "lint": "node --check src/cli.js"
   },
   "dependencies": {
-    "activitysmith": "^0.1.8",
+    "activitysmith": "^1.0.0",
     "commander": "^12.1.0"
   }
 }
