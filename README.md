@@ -85,7 +85,24 @@ activitysmith push \
   --title "Build Failed 🚨" \
   --message "CI pipeline failed on main branch" \
   --redirection "https://github.com/org/repo/actions/runs/123456789" \
-  --actions '[{"title":"Open Failing Run","type":"open_url","url":"https://github.com/org/repo/actions/runs/123456789"},{"title":"Create Incident","type":"webhook","url":"https://hooks.example.com/incidents/create","method":"POST","body":{"service":"payments-api","severity":"high","source":"activitysmith-cli"}}]'
+  --actions '[
+    {
+      "title": "Open Failing Run",
+      "type": "open_url",
+      "url": "https://github.com/org/repo/actions/runs/123456789"
+    },
+    {
+      "title": "Create Incident",
+      "type": "webhook",
+      "url": "https://hooks.example.com/incidents/create",
+      "method": "POST",
+      "body": {
+        "service": "payments-api",
+        "severity": "high",
+        "source": "activitysmith-cli"
+      }
+    }
+  ]'
 ```
 
 You can also load actions from a file:
@@ -132,7 +149,14 @@ workflow changes.
 
 ```bash
 activitysmith activity start \
-  --content-state '{"title":"Nightly database backup","subtitle":"create snapshot","numberOfSteps":3,"currentStep":1,"type":"segmented_progress","color":"yellow"}' \
+  --content-state '{
+    "title": "Nightly database backup",
+    "subtitle": "create snapshot",
+    "numberOfSteps": 3,
+    "currentStep": 1,
+    "type": "segmented_progress",
+    "color": "yellow"
+  }' \
   --channels "devs,ops"
 ```
 
@@ -145,7 +169,12 @@ activitysmith activity start \
 ```bash
 activitysmith activity update \
   --activity-id "<activityId>" \
-  --content-state '{"title":"Nightly database backup","subtitle":"upload archive","numberOfSteps":4,"currentStep":2}'
+  --content-state '{
+    "title": "Nightly database backup",
+    "subtitle": "upload archive",
+    "numberOfSteps": 4,
+    "currentStep": 2
+  }'
 ```
 
 #### End
@@ -157,7 +186,13 @@ activitysmith activity update \
 ```bash
 activitysmith activity end \
   --activity-id "<activityId>" \
-  --content-state '{"title":"Nightly database backup","subtitle":"verify restore","numberOfSteps":4,"currentStep":4,"autoDismissMinutes":2}'
+  --content-state '{
+    "title": "Nightly database backup",
+    "subtitle": "verify restore",
+    "numberOfSteps": 4,
+    "currentStep": 4,
+    "autoDismissMinutes": 2
+  }'
 ```
 
 ### Progress Type
@@ -174,7 +209,13 @@ numeric range is the clearest signal.
 
 ```bash
 activitysmith activity start \
-  --content-state '{"title":"EV Charging","subtitle":"Added 30 mi range","percentage":15,"type":"progress","color":"lime"}'
+  --content-state '{
+    "title": "EV Charging",
+    "subtitle": "Added 30 mi range",
+    "percentage": 15,
+    "type": "progress",
+    "color": "lime"
+  }'
 ```
 
 #### Update
@@ -186,7 +227,11 @@ activitysmith activity start \
 ```bash
 activitysmith activity update \
   --activity-id "<activityId>" \
-  --content-state '{"title":"EV Charging","subtitle":"Added 120 mi range","percentage":60}'
+  --content-state '{
+    "title": "EV Charging",
+    "subtitle": "Added 120 mi range",
+    "percentage": 60
+  }'
 ```
 
 #### End
@@ -198,7 +243,12 @@ activitysmith activity update \
 ```bash
 activitysmith activity end \
   --activity-id "<activityId>" \
-  --content-state '{"title":"EV Charging","subtitle":"Added 200 mi range","percentage":100,"autoDismissMinutes":2}'
+  --content-state '{
+    "title": "EV Charging",
+    "subtitle": "Added 200 mi range",
+    "percentage": 100,
+    "autoDismissMinutes": 2
+  }'
 ```
 
 ### Live Activity Action
@@ -213,8 +263,18 @@ Just like Actionable Push Notifications, Live Activities can have a button that 
 
 ```bash
 activitysmith activity start \
-  --content-state '{"title":"Deploying payments-api","subtitle":"Running database migrations","numberOfSteps":5,"currentStep":3,"type":"segmented_progress"}' \
-  --action '{"title":"Open Workflow","type":"open_url","url":"https://github.com/acme/payments-api/actions/runs/1234567890"}'
+  --content-state '{
+    "title": "Deploying payments-api",
+    "subtitle": "Running database migrations",
+    "numberOfSteps": 5,
+    "currentStep": 3,
+    "type": "segmented_progress"
+  }' \
+  --action '{
+    "title": "Open Workflow",
+    "type": "open_url",
+    "url": "https://github.com/acme/payments-api/actions/runs/1234567890"
+  }'
 ```
 
 #### Webhook action
@@ -222,8 +282,22 @@ activitysmith activity start \
 ```bash
 activitysmith activity update \
   --activity-id "<activityId>" \
-  --content-state '{"title":"Reindexing product search","subtitle":"Shard 7 of 12","numberOfSteps":12,"currentStep":7}' \
-  --action '{"title":"Pause Reindex","type":"webhook","url":"https://ops.example.com/hooks/search/reindex/pause","method":"POST","body":{"job_id":"reindex-2026-03-19","requested_by":"activitysmith-cli"}}'
+  --content-state '{
+    "title": "Reindexing product search",
+    "subtitle": "Shard 7 of 12",
+    "numberOfSteps": 12,
+    "currentStep": 7
+  }' \
+  --action '{
+    "title": "Pause Reindex",
+    "type": "webhook",
+    "url": "https://ops.example.com/hooks/search/reindex/pause",
+    "method": "POST",
+    "body": {
+      "job_id": "reindex-2026-03-19",
+      "requested_by": "activitysmith-cli"
+    }
+  }'
 ```
 
 ## Channels
