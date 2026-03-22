@@ -116,14 +116,127 @@ activitysmith push \
 
 ## Live Activities
 
-Live Activities come in two UI types, but the lifecycle stays the same:
-start the activity, keep the returned `activity_id`, update it as state
-changes, then end it when the work is done.
+<p align="center">
+  <img src="https://cdn.activitysmith.com/features/metrics-live-activity-action.png" alt="Live Activities example" width="680" />
+</p>
 
-- `segmented_progress`: best for jobs tracked in steps
-- `progress`: best for jobs tracked as a percentage or numeric range
+ActivitySmith supports two ways to drive Live Activities:
 
-### Shared flow
+- Recommended: stream updates with `activitysmith activity stream ...`
+- Advanced: manual lifecycle control with `activity start`, `activity update`, and `activity end`
+
+Use stream updates when you want the easiest, stateless flow. You do not need to
+store `activity_id` or manage lifecycle state yourself. Send the latest state
+for a stable `stream_key` and ActivitySmith will start or update the Live
+Activity for you. When the tracked process is over, call `activity end-stream`.
+
+Use the manual lifecycle commands when you need direct control over a specific
+Live Activity instance.
+
+Live Activity UI types:
+
+- `metrics`: best for live operational stats like server CPU and memory, queue depth, or replica lag
+- `segmented_progress`: best for step-based workflows like deployments, backups, and ETL pipelines
+- `progress`: best for continuous jobs like uploads, reindexes, and long-running migrations tracked as a percentage
+
+### Recommended: Stream updates
+
+Use a stable `stream_key` to identify the system or workflow you are tracking,
+such as a server, deployment, build pipeline, cron job, or charging session.
+This is especially useful for cron jobs and other scheduled tasks where you do
+not want to store `activity_id` between runs.
+
+#### Metrics
+
+<p align="center">
+  <img src="https://cdn.activitysmith.com/features/metrics-live-activity-start.png" alt="Metrics stream example" width="680" />
+</p>
+
+```bash
+activitysmith activity stream prod-web-1 \
+  --content-state '{
+    "title": "Server Health",
+    "subtitle": "prod-web-1",
+    "type": "metrics",
+    "metrics": [
+      { "label": "CPU", "value": 9, "unit": "%" },
+      { "label": "MEM", "value": 45, "unit": "%" }
+    ]
+  }'
+```
+
+#### Segmented progress
+
+<p align="center">
+  <img src="https://cdn.activitysmith.com/features/update-live-activity.png" alt="Segmented progress stream example" width="680" />
+</p>
+
+```bash
+activitysmith activity stream nightly-backup \
+  --content-state '{
+    "title": "Nightly Backup",
+    "subtitle": "upload archive",
+    "type": "segmented_progress",
+    "numberOfSteps": 3,
+    "currentStep": 2
+  }'
+```
+
+#### Progress
+
+<p align="center">
+  <img src="https://cdn.activitysmith.com/features/progress-live-activity.png" alt="Progress stream example" width="680" />
+</p>
+
+```bash
+activitysmith activity stream search-reindex \
+  --content-state '{
+    "title": "Search Reindex",
+    "subtitle": "catalog-v2",
+    "type": "progress",
+    "percentage": 42
+  }'
+```
+
+Run `activitysmith activity stream <stream-key> ...` again with the same
+`stream_key` whenever the state changes.
+
+#### End a stream
+
+Use this when the tracked process is finished and you no longer want the Live
+Activity on devices. `content_state` is optional here; include it if you want
+to end the stream with a final state.
+
+```bash
+activitysmith activity end-stream prod-web-1 \
+  --content-state '{
+    "title": "Server Health",
+    "subtitle": "prod-web-1",
+    "type": "metrics",
+    "metrics": [
+      { "label": "CPU", "value": 7, "unit": "%" },
+      { "label": "MEM", "value": 38, "unit": "%" }
+    ]
+  }'
+```
+
+If you later send another `activity stream` request with the same `stream_key`,
+ActivitySmith starts a new Live Activity for that stream again.
+
+Stream responses include an `operation` field:
+
+- `started`: ActivitySmith started a new Live Activity for this `stream_key`
+- `updated`: ActivitySmith updated the current Live Activity
+- `rotated`: ActivitySmith ended the previous Live Activity and started a new one
+- `noop`: the incoming state matched the current state, so no update was sent
+- `paused`: the stream is paused, so no Live Activity was started or updated
+- `ended`: returned by `activity end-stream` after the stream is ended
+
+### Advanced: Manual lifecycle control
+
+Use these commands when you want to manage the Live Activity lifecycle yourself.
+
+#### Shared flow
 
 1. Run `activitysmith activity start ...`.
 2. Save the returned `activity_id`.
@@ -133,13 +246,77 @@ changes, then end it when the work is done.
 You can use `--content-state <json>` for the examples below, or build the same
 payload with flags as documented in `Content State Options`.
 
+### Metrics Type
+
+Use `metrics` when you want to keep a small set of live stats visible, such as
+server health, queue pressure, or database load.
+
+#### Start
+
+<p align="center">
+  <img src="https://cdn.activitysmith.com/features/metrics-live-activity-start.png" alt="Metrics start example" width="680" />
+</p>
+
+```bash
+activitysmith activity start \
+  --content-state '{
+    "title": "Server Health",
+    "subtitle": "prod-web-1",
+    "type": "metrics",
+    "metrics": [
+      { "label": "CPU", "value": 9, "unit": "%" },
+      { "label": "MEM", "value": 45, "unit": "%" }
+    ]
+  }'
+```
+
+#### Update
+
+<p align="center">
+  <img src="https://cdn.activitysmith.com/features/metrics-live-activity-update.png" alt="Metrics update example" width="680" />
+</p>
+
+```bash
+activitysmith activity update \
+  --activity-id "<activityId>" \
+  --content-state '{
+    "title": "Server Health",
+    "subtitle": "prod-web-1",
+    "type": "metrics",
+    "metrics": [
+      { "label": "CPU", "value": 76, "unit": "%" },
+      { "label": "MEM", "value": 52, "unit": "%" }
+    ]
+  }'
+```
+
+#### End
+
+<p align="center">
+  <img src="https://cdn.activitysmith.com/features/metrics-live-activity-end.png" alt="Metrics end example" width="680" />
+</p>
+
+```bash
+activitysmith activity end \
+  --activity-id "<activityId>" \
+  --content-state '{
+    "title": "Server Health",
+    "subtitle": "prod-web-1",
+    "type": "metrics",
+    "metrics": [
+      { "label": "CPU", "value": 7, "unit": "%" },
+      { "label": "MEM", "value": 38, "unit": "%" }
+    ],
+    "autoDismissMinutes": 2
+  }'
+```
+
 ### Segmented Progress Type
 
 Use `segmented_progress` when progress is easier to follow as steps instead of a
 raw percentage. It fits jobs like deployments, backups, ETL pipelines, and
-checklists where "step 2 of 3" is more useful than "67%".
-`numberOfSteps` is dynamic, so you can increase or decrease it later if the
-workflow changes.
+checklists where "step 2 of 3" is more useful than "67%". `numberOfSteps` is
+dynamic, so you can increase or decrease it later if the workflow changes.
 
 #### Start
 
@@ -156,8 +333,7 @@ activitysmith activity start \
     "currentStep": 1,
     "type": "segmented_progress",
     "color": "yellow"
-  }' \
-  --channels "devs,ops"
+  }'
 ```
 
 #### Update
@@ -172,7 +348,7 @@ activitysmith activity update \
   --content-state '{
     "title": "Nightly database backup",
     "subtitle": "upload archive",
-    "numberOfSteps": 4,
+    "numberOfSteps": 3,
     "currentStep": 2
   }'
 ```
@@ -189,8 +365,8 @@ activitysmith activity end \
   --content-state '{
     "title": "Nightly database backup",
     "subtitle": "verify restore",
-    "numberOfSteps": 4,
-    "currentStep": 4,
+    "numberOfSteps": 3,
+    "currentStep": 3,
     "autoDismissMinutes": 2
   }'
 ```
@@ -212,9 +388,8 @@ activitysmith activity start \
   --content-state '{
     "title": "EV Charging",
     "subtitle": "Added 30 mi range",
-    "percentage": 15,
     "type": "progress",
-    "color": "lime"
+    "percentage": 15
   }'
 ```
 
@@ -253,10 +428,10 @@ activitysmith activity end \
 
 ### Live Activity Action
 
-Just like Actionable Push Notifications, Live Activities can have a button that opens provided URL in a browser or triggers a webhook. Webhooks are executed by the ActivitySmith backend.
+Just like Actionable Push Notifications, Live Activities can have a button that opens a URL in a browser or triggers a webhook. Webhooks are executed by the ActivitySmith backend.
 
 <p align="center">
-  <img src="https://cdn.activitysmith.com/features/live-activity-with-action.png?v=20260319-1" alt="Live Activity with action" width="680" />
+  <img src="https://cdn.activitysmith.com/features/metrics-live-activity-action.png" alt="Metrics Live Activity with action" width="680" />
 </p>
 
 #### Open URL action
@@ -264,16 +439,18 @@ Just like Actionable Push Notifications, Live Activities can have a button that 
 ```bash
 activitysmith activity start \
   --content-state '{
-    "title": "Deploying payments-api",
-    "subtitle": "Running database migrations",
-    "numberOfSteps": 5,
-    "currentStep": 3,
-    "type": "segmented_progress"
+    "title": "Server Health",
+    "subtitle": "prod-web-1",
+    "type": "metrics",
+    "metrics": [
+      { "label": "CPU", "value": 76, "unit": "%" },
+      { "label": "MEM", "value": 52, "unit": "%" }
+    ]
   }' \
   --action '{
-    "title": "Open Workflow",
+    "title": "Open Dashboard",
     "type": "open_url",
-    "url": "https://github.com/acme/payments-api/actions/runs/1234567890"
+    "url": "https://ops.example.com/servers/prod-web-1"
   }'
 ```
 
@@ -283,18 +460,21 @@ activitysmith activity start \
 activitysmith activity update \
   --activity-id "<activityId>" \
   --content-state '{
-    "title": "Reindexing product search",
-    "subtitle": "Shard 7 of 12",
-    "numberOfSteps": 12,
-    "currentStep": 7
+    "title": "Server Health",
+    "subtitle": "prod-web-1",
+    "type": "metrics",
+    "metrics": [
+      { "label": "CPU", "value": 91, "unit": "%" },
+      { "label": "MEM", "value": 57, "unit": "%" }
+    ]
   }' \
   --action '{
-    "title": "Pause Reindex",
+    "title": "Restart Service",
     "type": "webhook",
-    "url": "https://ops.example.com/hooks/search/reindex/pause",
+    "url": "https://ops.example.com/hooks/servers/prod-web-1/restart",
     "method": "POST",
     "body": {
-      "job_id": "reindex-2026-03-19",
+      "server_id": "prod-web-1",
       "requested_by": "activitysmith-cli"
     }
   }'
@@ -320,12 +500,17 @@ The CLI installs two bin names:
 
 ## Content State Options
 
-For `activity start|update|end`, you can pass content state via JSON:
+For `activity stream|start|update|end|end-stream`, you can pass content state via JSON:
 
 - `--content-state <json>`
 - `--content-state-file <path>`
 
-Or use flags to build the payload:
+For `metrics`, you can also pass the metrics array directly:
+
+- `--metrics <json-array>`
+- `--metrics-file <path>`
+
+Or use flags to build the rest of the payload:
 
 - `--title <title>`
 - `--subtitle <subtitle>`
@@ -346,13 +531,15 @@ Live Activity action options:
 
 Targeting options:
 
-- `--channels <comma-separated-slugs>` (for `push` and `activity start`)
+- `--channels <comma-separated-slugs>` (for `push`, `activity stream`, and `activity start`)
 
 Required fields:
 
-- `activity start`: `--title`, `--type`, plus either `--number-of-steps` and `--current-step`, or `--percentage`, or `--value` with `--upper-limit`
-- `activity update`: `--title`, plus either `--current-step`, or `--percentage`, or `--value` with `--upper-limit`
-- `activity end`: `--title`, plus either `--current-step`, or `--percentage`, or `--value` with `--upper-limit`
+- `activity stream`: `--title`, `--type`, plus `--metrics`, `--number-of-steps` and `--current-step`, `--percentage`, or `--value` with `--upper-limit`
+- `activity start`: `--title`, `--type`, plus `--metrics`, `--number-of-steps` and `--current-step`, `--percentage`, or `--value` with `--upper-limit`
+- `activity update`: `--title`, plus `--metrics`, `--current-step`, `--percentage`, or `--value` with `--upper-limit`
+- `activity end`: `--title`, plus `--metrics`, `--current-step`, `--percentage`, or `--value` with `--upper-limit`
+- `activity end-stream`: no content state is required, but if you provide one it follows the same rules as `activity end`
 
 ## Output
 

@@ -77,6 +77,8 @@ const addContentStateOptions = (command, { includeAutoDismiss } = {}) => {
   command
     .option("--content-state <json>", "Content state as JSON string")
     .option("--content-state-file <path>", "Content state JSON file path")
+    .option("--metrics <json>", "Content state metrics as JSON array")
+    .option("--metrics-file <path>", "Content state metrics JSON file path")
     .option("--title <title>", "Content state title")
     .option("--subtitle <subtitle>", "Content state subtitle")
     .option("--type <type>", "Content state type")
@@ -221,10 +223,11 @@ const validateContentState = (contentState, mode) => {
   if (
     normalizedType !== undefined &&
     normalizedType !== "segmented_progress" &&
-    normalizedType !== "progress"
+    normalizedType !== "progress" &&
+    normalizedType !== "metrics"
   ) {
     throw new Error(
-      "contentState.type must be one of: segmented_progress, progress"
+      "contentState.type must be one of: segmented_progress, progress, metrics"
     );
   }
 
@@ -234,6 +237,7 @@ const validateContentState = (contentState, mode) => {
   const hasValue = hasOwn(contentState, "value");
   const hasUpperLimit = hasOwn(contentState, "upperLimit");
   const hasStepColor = hasOwn(contentState, "stepColor");
+  const hasMetrics = hasOwn(contentState, "metrics");
 
   if (hasValue !== hasUpperLimit) {
     throw new Error(
@@ -269,11 +273,36 @@ const validateContentState = (contentState, mode) => {
     );
   }
 
+  if (hasMetrics && (hasSegmentedFields || hasProgressFields)) {
+    throw new Error(
+      "Do not mix metrics fields with segmented_progress or progress fields in the same contentState"
+    );
+  }
+
+  if (hasMetrics) {
+    if (!Array.isArray(contentState.metrics) || contentState.metrics.length === 0) {
+      throw new Error("contentState.metrics must be a non-empty array");
+    }
+
+    contentState.metrics.forEach((metric, index) => {
+      assertPlainObject(metric, `contentState.metrics[${index}]`);
+      if (!isNonEmptyString(metric.label)) {
+        throw new Error(`contentState.metrics[${index}].label is required`);
+      }
+      if (!Number.isFinite(metric.value)) {
+        throw new Error(`contentState.metrics[${index}].value must be a number`);
+      }
+      if (metric.unit !== undefined && typeof metric.unit !== "string") {
+        throw new Error(`contentState.metrics[${index}].unit must be a string`);
+      }
+    });
+  }
+
   const effectiveType = normalizedType;
 
-  if (mode === "start") {
+  if (mode === "start" || mode === "stream") {
     if (!effectiveType) {
-      throw new Error("contentState.type is required for activity start");
+      throw new Error(`contentState.type is required for activity ${mode}`);
     }
 
     if (effectiveType === "segmented_progress") {
@@ -285,9 +314,16 @@ const validateContentState = (contentState, mode) => {
       return;
     }
 
+    if (effectiveType === "metrics") {
+      if (!hasMetrics) {
+        throw new Error(`metrics ${mode} requires contentState.metrics`);
+      }
+      return;
+    }
+
     if (!hasPercentage && !hasValue) {
       throw new Error(
-        "progress start requires contentState.percentage, or contentState.value with contentState.upperLimit"
+        `progress ${mode} requires contentState.percentage, or contentState.value with contentState.upperLimit`
       );
     }
     return;
@@ -311,10 +347,21 @@ const validateContentState = (contentState, mode) => {
     return;
   }
 
-  if (!hasSegmentedFields && !hasProgressFields) {
+  if (effectiveType === "metrics") {
+    if (!hasMetrics) {
+      throw new Error(`metrics ${mode} requires contentState.metrics`);
+    }
+    return;
+  }
+
+  if (!hasSegmentedFields && !hasProgressFields && !hasMetrics) {
     throw new Error(
-      `contentState for activity ${mode} must include either segmented_progress fields or progress fields`
+      `contentState for activity ${mode} must include metrics, segmented_progress fields, or progress fields`
     );
+  }
+
+  if (hasMetrics) {
+    return;
   }
 
   if (hasSegmentedFields && !hasCurrentStep) {
@@ -487,6 +534,22 @@ const buildContentStateFromOptions = (options) => {
   return contentState;
 };
 
+const loadMetrics = async (options) => {
+  if (options.metrics && options.metricsFile) {
+    throw new Error("Provide either --metrics or --metrics-file, not both.");
+  }
+
+  if (options.metricsFile) {
+    return readJsonArrayFile(options.metricsFile, "metrics-file");
+  }
+
+  if (options.metrics) {
+    return parseJsonArrayString(options.metrics, "metrics");
+  }
+
+  return undefined;
+};
+
 const toApiContentState = (contentState) => {
   const keyMap = {
     numberOfSteps: "number_of_steps",
@@ -561,6 +624,32 @@ const toApiLiveActivityEndRequest = (activityId, contentState, action) => {
   return request;
 };
 
+const toApiLiveActivityStreamRequest = (contentState, action) => {
+  const request = {
+    content_state: toApiContentState(contentState),
+  };
+
+  if (action !== undefined) {
+    request.action = action;
+  }
+
+  return request;
+};
+
+const toApiLiveActivityStreamDeleteRequest = (contentState, action) => {
+  const request = {};
+
+  if (contentState !== undefined) {
+    request.content_state = toApiContentState(contentState);
+  }
+
+  if (action !== undefined) {
+    request.action = action;
+  }
+
+  return request;
+};
+
 const loadContentState = async (options, mode) => {
   let contentState = {};
 
@@ -583,6 +672,11 @@ const loadContentState = async (options, mode) => {
   const fromFlags = buildContentStateFromOptions(options);
   contentState = { ...contentState, ...fromFlags };
 
+  const metrics = await loadMetrics(options);
+  if (metrics !== undefined) {
+    contentState.metrics = metrics;
+  }
+
   if (Object.keys(contentState).length === 0) {
     throw new Error(
       "contentState is required. Provide --content-state, --content-state-file, or field flags."
@@ -591,6 +685,41 @@ const loadContentState = async (options, mode) => {
 
   validateContentState(contentState, mode);
 
+  return contentState;
+};
+
+const loadOptionalContentState = async (options, mode) => {
+  let contentState = {};
+
+  if (options.contentStateFile) {
+    const fromFile = await readJsonFile(
+      options.contentStateFile,
+      "content-state-file"
+    );
+    contentState = { ...contentState, ...fromFile };
+  }
+
+  if (options.contentState) {
+    const fromString = parseJsonString(
+      options.contentState,
+      "content-state"
+    );
+    contentState = { ...contentState, ...fromString };
+  }
+
+  const fromFlags = buildContentStateFromOptions(options);
+  contentState = { ...contentState, ...fromFlags };
+
+  const metrics = await loadMetrics(options);
+  if (metrics !== undefined) {
+    contentState.metrics = metrics;
+  }
+
+  if (Object.keys(contentState).length === 0) {
+    return undefined;
+  }
+
+  validateContentState(contentState, mode);
   return contentState;
 };
 
@@ -780,6 +909,47 @@ const activityCommand = program
 
 addLiveActivityActionOptions(addContentStateOptions(
   activityCommand
+    .command("stream")
+    .description("Send a stateless Live Activity stream update")
+    .argument("<stream-key>", "Stable stream key")
+    .option(
+      "--channels <channels>",
+      "Comma-separated channel slugs (optional)",
+      parseChannelsOption
+    )
+    .action(async (streamKey, options) => {
+      const globalOptions = program.opts();
+
+      try {
+        const apiKey = requireApiKey(globalOptions);
+        const client = createClient(apiKey);
+        const contentState = await loadContentState(options, "stream");
+        const action = await loadLiveActivityAction(options);
+
+        const response = await client.liveActivities.stream(
+          streamKey,
+          withTargetChannels(
+            toApiLiveActivityStreamRequest(contentState, action),
+            options.channels
+          )
+        );
+
+        const activityId = response?.activityId ?? response?.activity_id;
+        const operation = response?.operation;
+        outputResult(response, globalOptions, [
+          "Live Activity stream reconciled.",
+          streamKey ? `Stream key: ${streamKey}` : null,
+          operation ? `Operation: ${operation}` : null,
+          activityId ? `Activity ID: ${activityId}` : null,
+        ]);
+      } catch (error) {
+        await handleError(error, globalOptions);
+      }
+    })
+));
+
+addLiveActivityActionOptions(addContentStateOptions(
+  activityCommand
     .command("start")
     .description("Start a Live Activity")
     .option(
@@ -871,6 +1041,42 @@ addLiveActivityActionOptions(addContentStateOptions(
         outputResult(response, globalOptions, [
           "Live Activity ended.",
           options.activityId ? `Activity ID: ${options.activityId}` : null,
+        ]);
+      } catch (error) {
+        await handleError(error, globalOptions);
+      }
+    }),
+  { includeAutoDismiss: true }
+));
+
+addLiveActivityActionOptions(addContentStateOptions(
+  activityCommand
+    .command("end-stream")
+    .description("End a stateless Live Activity stream")
+    .argument("<stream-key>", "Stable stream key")
+    .action(async (streamKey, options) => {
+      const globalOptions = program.opts();
+
+      try {
+        const apiKey = requireApiKey(globalOptions);
+        const client = createClient(apiKey);
+        const contentState = await loadOptionalContentState(options, "end");
+        const action = await loadLiveActivityAction(options);
+
+        const request =
+          contentState !== undefined || action !== undefined
+            ? toApiLiveActivityStreamDeleteRequest(contentState, action)
+            : undefined;
+
+        const response = await client.liveActivities.endStream(streamKey, request);
+
+        const activityId = response?.activityId ?? response?.activity_id;
+        const operation = response?.operation;
+        outputResult(response, globalOptions, [
+          "Live Activity stream ended.",
+          streamKey ? `Stream key: ${streamKey}` : null,
+          operation ? `Operation: ${operation}` : null,
+          activityId ? `Activity ID: ${activityId}` : null,
         ]);
       } catch (error) {
         await handleError(error, globalOptions);
