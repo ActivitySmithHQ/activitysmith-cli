@@ -428,7 +428,7 @@ activitysmith activity end \
 
 ### Live Activity Action
 
-Just like Actionable Push Notifications, Live Activities can have a button that opens a URL in a browser or triggers a webhook. Webhooks are executed by the ActivitySmith backend.
+Just like Actionable Push Notifications, Live Activities can have a button that opens provided URL in a browser or triggers a webhook. Webhooks are executed by the ActivitySmith backend.
 
 <p align="center">
   <img src="https://cdn.activitysmith.com/features/metrics-live-activity-action.png" alt="Metrics Live Activity with action" width="680" />
@@ -456,25 +456,26 @@ activitysmith activity start \
 
 #### Webhook action
 
+<p align="center">
+  <img src="https://cdn.activitysmith.com/features/live-activity-with-action.png?v=20260319-1" alt="Live Activity with action" width="680" />
+</p>
+
 ```bash
 activitysmith activity update \
   --activity-id "<activityId>" \
   --content-state '{
-    "title": "Server Health",
-    "subtitle": "prod-web-1",
-    "type": "metrics",
-    "metrics": [
-      { "label": "CPU", "value": 91, "unit": "%" },
-      { "label": "MEM", "value": 57, "unit": "%" }
-    ]
+    "title": "Reindexing product search",
+    "subtitle": "Shard 7 of 12",
+    "numberOfSteps": 12,
+    "currentStep": 7
   }' \
   --action '{
-    "title": "Restart Service",
+    "title": "Pause Reindex",
     "type": "webhook",
-    "url": "https://ops.example.com/hooks/servers/prod-web-1/restart",
+    "url": "https://ops.example.com/hooks/search/reindex/pause",
     "method": "POST",
     "body": {
-      "server_id": "prod-web-1",
+      "job_id": "reindex-2026-03-19",
       "requested_by": "activitysmith-cli"
     }
   }'
