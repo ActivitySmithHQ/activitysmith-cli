@@ -2,6 +2,29 @@
 
 CLI wrapper for the ActivitySmith API using the official Node SDK.
 
+## Table of Contents
+
+- [Install](#install)
+- [Install Skill (Codex/Claude/Other Skills-Compatible Agents)](#install-skill-codexclaudeother-skills-compatible-agents)
+- [Auth](#auth)
+- [Push Notifications](#push-notifications)
+  - [Send Push Notification](#send-push-notification)
+  - [Rich Push Notifications with Media](#rich-push-notifications-with-media)
+  - [Actionable Push Notifications](#actionable-push-notifications)
+- [Live Activities](#live-activities)
+  - [Simple: Let ActivitySmith manage the Live Activity for you](#simple-let-activitysmith-manage-the-live-activity-for-you)
+  - [Advanced: Full lifecycle control](#advanced-full-lifecycle-control)
+  - [Stats](#stats)
+  - [Metrics](#metrics)
+  - [Segmented Progress](#segmented-progress)
+  - [Progress](#progress)
+  - [Live Activity Action](#live-activity-action)
+- [Channels](#channels)
+- [Widgets](#widgets)
+- [Aliases](#aliases)
+- [Content State Options](#content-state-options)
+- [Output](#output)
+
 ## Install
 
 ```bash
@@ -120,8 +143,9 @@ activitysmith push \
   <img src="https://cdn.activitysmith.com/features/metrics-live-activity-action.png" alt="Metrics Live Activity screenshot" width="680" />
 </p>
 
-There are three types of Live Activities:
+There are four types of Live Activities:
 
+- `stats`: best for compact business or product stats like revenue, orders, conversion, and average order value
 - `metrics`: best for live operational stats like server CPU and memory, queue depth, or replica lag
 - `segmented_progress`: best for step-based workflows like deployments, backups, and ETL pipelines
 - `progress`: best for continuous jobs like uploads, reindexes, and long-running migrations tracked as a percentage
@@ -141,12 +165,35 @@ activity's state.
 In the following sections, we'll break down how to implement each method so you
 can choose what fits your use case best.
 
-### Simple: Let ActivitySmith manage the Live Activity for you.
+### Simple: Let ActivitySmith manage the Live Activity for you
 
 Use a stable `stream_key` to identify the system or workflow you are tracking,
 such as a server, deployment, build pipeline, cron job, or charging session.
 This is especially useful for cron jobs and other scheduled tasks where you do
 not want to store `activity_id` between runs.
+
+#### Stats
+
+<p align="center">
+  <img src="https://cdn.activitysmith.com/features/stats-live-activity.png" alt="Stats stream example" width="680" />
+</p>
+
+```bash
+activitysmith activity stream sales-hourly \
+  --content-state '{
+    "title": "Sales",
+    "subtitle": "last hour",
+    "type": "stats",
+    "metrics": [
+      { "label": "Revenue", "value": "$2430", "color": "blue" },
+      { "label": "Orders", "value": "37", "color": "green" },
+      { "label": "Conversion", "value": "4.8%", "color": "magenta" },
+      { "label": "Avg Order", "value": "$65.68", "color": "yellow" },
+      { "label": "Refunds", "value": "$84", "color": "red" },
+      { "label": "New Buyers", "value": "18", "color": "cyan" }
+    ]
+  }'
+```
 
 #### Metrics
 
@@ -245,6 +292,78 @@ Use these commands when you want to manage the Live Activity lifecycle yourself:
 
 You can use `--content-state <json>` for the examples below, or build the same
 payload with flags as documented in `Content State Options`.
+
+### Stats
+
+Keep your key numbers on your Lock Screen. `stats` fits up to 8 labeled values,
+such as revenue, orders, conversion, uptime, or any other business metric you
+want visible at a glance. Each metric can use a formatted string or number as
+its `value`. Add `color` to a metric to show an accent dot next to its label;
+omit `color` to show the label without a dot.
+
+#### Start
+
+<p align="center">
+  <img src="https://cdn.activitysmith.com/features/stats-live-activity.png" alt="Stats Live Activity with sales revenue, orders, conversion, and average order value" width="680" />
+</p>
+
+```bash
+activitysmith activity start \
+  --content-state '{
+    "title": "Sales",
+    "subtitle": "last hour",
+    "type": "stats",
+    "metrics": [
+      { "label": "Revenue", "value": "$2430", "color": "blue" },
+      { "label": "Orders", "value": "37", "color": "green" },
+      { "label": "Conversion", "value": "4.8%", "color": "magenta" },
+      { "label": "Avg Order", "value": "$65.68", "color": "yellow" },
+      { "label": "Refunds", "value": "$84", "color": "red" },
+      { "label": "New Buyers", "value": "18", "color": "cyan" }
+    ]
+  }'
+```
+
+#### Update
+
+```bash
+activitysmith activity update \
+  --activity-id "<activityId>" \
+  --content-state '{
+    "title": "Sales",
+    "subtitle": "last hour",
+    "type": "stats",
+    "metrics": [
+      { "label": "Revenue", "value": "$3180", "color": "blue" },
+      { "label": "Orders", "value": "51", "color": "green" },
+      { "label": "Conversion", "value": "5.2%", "color": "magenta" },
+      { "label": "Avg Order", "value": "$62.35", "color": "yellow" },
+      { "label": "Refunds", "value": "$126", "color": "red" },
+      { "label": "New Buyers", "value": "24", "color": "cyan" }
+    ]
+  }'
+```
+
+#### End
+
+```bash
+activitysmith activity end \
+  --activity-id "<activityId>" \
+  --content-state '{
+    "title": "Sales",
+    "subtitle": "last hour",
+    "type": "stats",
+    "metrics": [
+      { "label": "Revenue", "value": "$3460", "color": "blue" },
+      { "label": "Orders", "value": "58", "color": "green" },
+      { "label": "Conversion", "value": "5.4%", "color": "magenta" },
+      { "label": "Avg Order", "value": "$59.66", "color": "yellow" },
+      { "label": "Refunds", "value": "$92", "color": "red" },
+      { "label": "New Buyers", "value": "31", "color": "cyan" }
+    ],
+    "autoDismissMinutes": 2
+  }'
+```
 
 ### Metrics Type
 
@@ -492,6 +611,30 @@ activitysmith push \
   --channels "devs,ops"
 ```
 
+## Widgets
+
+<p align="center">
+  <img src="https://cdn.activitysmith.com/features/lock-screen-widgets.png" alt="Lock screen widgets" width="680" />
+</p>
+
+ActivitySmith lets you display any value on your Lock Screen with widgets - SaaS metrics, revenue, signups, uptime, habits, or anything else you want to track. Create a metric in the <a href="https://activitysmith.com/app/widgets" target="_blank" rel="noopener noreferrer">web app</a>, then update the metric value using our API, add a widget to your lock screen and it will fetch the latest update automatically.
+
+<p align="center">
+  <img src="https://cdn.activitysmith.com/features/create-widget-metric.png" alt="Create widget metric" width="680" />
+</p>
+
+Use the metric key to update its value.
+
+```bash
+activitysmith metrics update deploy.success_rate 99.9
+```
+
+String metric values work too.
+
+```bash
+activitysmith metrics update prod.status healthy
+```
+
 ## Aliases
 
 The CLI installs two bin names:
@@ -506,7 +649,7 @@ For `activity stream|start|update|end|end-stream`, you can pass content state vi
 - `--content-state <json>`
 - `--content-state-file <path>`
 
-For `metrics`, you can also pass the metrics array directly:
+For `metrics` and `stats`, you can also pass the metrics array directly:
 
 - `--metrics <json-array>`
 - `--metrics-file <path>`
@@ -533,6 +676,11 @@ Live Activity action options:
 Targeting options:
 
 - `--channels <comma-separated-slugs>` (for `push`, `activity stream`, and `activity start`)
+
+Widget metric options:
+
+- `activitysmith metrics update <metric-key> <value>`
+- `activitysmith metric update <metric-key> <value>` (alias)
 
 Required fields:
 

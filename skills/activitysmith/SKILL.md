@@ -1,28 +1,30 @@
 ---
-
-## name: activitysmith
-
-description: Send ActivitySmith Push Notifications and run Live Activity start/update/end lifecycle from coding agents through the bundled ActivitySmith CLI scripts. Use when an agent should send milestone, blocker, review, or completion alerts to iPhone or iPad, or keep long-running work visible step by step with Live Activities.
+name: activitysmith
+description: Send ActivitySmith Push Notifications, update widget metrics, and run Live Activity start/update/end lifecycle from coding agents through the bundled ActivitySmith CLI scripts. Use when an agent should send milestone, blocker, review, or completion alerts to iPhone or iPad, update a Lock Screen widget value, or keep long-running work visible step by step with Live Activities.
+---
 
 # ActivitySmith
 
 Use this skill to let Codex, Claude, or any skills-compatible agent send:
 
 - Push Notifications for milestone, blocker, review, and completion alerts
+- Widget metrics for values that should stay visible on the Lock Screen
 - Live Activities for step-by-step status during long-running work
 
-Install the ActivitySmith skill, then tell your agent like Claude or Codex to keep you updated while it works. It can send Push Notifications for milestone, blocker, and completion alerts, and use Live Activities for step-by-step status on your iOS device(s) during long-running tasks.
+Install the ActivitySmith skill, then tell your agent like Claude or Codex to keep you updated while it works. It can send Push Notifications for milestone, blocker, and completion alerts, update widget metric values, and use Live Activities for step-by-step status on your iOS device(s) during long-running tasks.
 
 ## Requirements
 
 - Ensure `activitysmith` is available in `PATH`
 - Set `ACTIVITYSMITH_API_KEY` in the shell, or in `skills/activitysmith/.env`
 - Use the bundled scripts in `./skills/activitysmith/scripts/`
+- Use `activitysmith metrics update` directly for widget metric values
 - Run any bundled script with `-h` when you need the full flag reference
 
 ## Choose The Right Signal
 
 - Use a Push Notification when one alert is enough
+- Use a widget metric when one value should stay visible after the task ends
 - Use a Live Activity when work will move through stages or progress over time
 - Use channels when only some devices or teammates should receive the update
 - Prefer concise human copy: short title, concrete subtitle, clear message
@@ -148,6 +150,26 @@ activity_id="$(./skills/activitysmith/scripts/start_activity.sh \
 - Use `--action` or `--action-file` when the Live Activity should open a URL or trigger a webhook
 - Never mix segmented and progress fields in the same command
 - Never call update or end without a valid Activity ID from start
+
+## Widget Metrics
+
+Use widget metrics for values that should stay visible after a task finishes.
+
+```bash
+activitysmith metrics update deploy.success_rate 99.9
+```
+
+String values work too.
+
+```bash
+activitysmith metrics update prod.status healthy
+```
+
+### Follow These Widget Rules
+
+- Use a stable metric key created in the ActivitySmith web app
+- Use numbers for counters, percentages, currency, and units
+- Use short strings for states like `healthy`, `blocked`, or `paused`
 
 ### Add A Live Activity Action
 

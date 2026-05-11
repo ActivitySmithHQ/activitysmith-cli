@@ -54,6 +54,30 @@ const parseChannelsOption = (value) => {
   return channels;
 };
 
+const parseMetricValueArgument = (value) => {
+  if (typeof value !== "string") {
+    throw new InvalidArgumentError("value must be a string or number");
+  }
+
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    throw new InvalidArgumentError("value cannot be empty");
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (typeof parsed === "string" || typeof parsed === "number") {
+      return parsed;
+    }
+    throw new InvalidArgumentError("value must be a string or number");
+  } catch (error) {
+    if (error instanceof InvalidArgumentError) {
+      throw error;
+    }
+    return value;
+  }
+};
+
 const normalizeHttpsUrl = (value, label) => {
   if (typeof value !== "string" || value.trim().length === 0) {
     throw new Error(`${label} must be a non-empty string`);
@@ -212,6 +236,18 @@ const isNonEmptyString = (value) =>
 const hasOwn = (object, key) =>
   Object.prototype.hasOwnProperty.call(object, key);
 
+const liveActivityMetricColors = new Set([
+  "blue",
+  "cyan",
+  "green",
+  "lime",
+  "magenta",
+  "orange",
+  "purple",
+  "red",
+  "yellow",
+]);
+
 const validateContentState = (contentState, mode) => {
   const normalizedType =
     typeof contentState.type === "string" ? contentState.type.trim() : undefined;
@@ -224,10 +260,11 @@ const validateContentState = (contentState, mode) => {
     normalizedType !== undefined &&
     normalizedType !== "segmented_progress" &&
     normalizedType !== "progress" &&
-    normalizedType !== "metrics"
+    normalizedType !== "metrics" &&
+    normalizedType !== "stats"
   ) {
     throw new Error(
-      "contentState.type must be one of: segmented_progress, progress, metrics"
+      "contentState.type must be one of: segmented_progress, progress, metrics, stats"
     );
   }
 
@@ -284,16 +321,40 @@ const validateContentState = (contentState, mode) => {
       throw new Error("contentState.metrics must be a non-empty array");
     }
 
+    if (normalizedType === "stats" && contentState.metrics.length > 8) {
+      throw new Error("stats contentState.metrics supports up to 8 items");
+    }
+
     contentState.metrics.forEach((metric, index) => {
       assertPlainObject(metric, `contentState.metrics[${index}]`);
       if (!isNonEmptyString(metric.label)) {
         throw new Error(`contentState.metrics[${index}].label is required`);
       }
-      if (!Number.isFinite(metric.value)) {
-        throw new Error(`contentState.metrics[${index}].value must be a number`);
+      if (normalizedType === "stats") {
+        if (!Number.isFinite(metric.value) && !isNonEmptyString(metric.value)) {
+          throw new Error(
+            `contentState.metrics[${index}].value must be a number or non-empty string`
+          );
+        }
+      } else if (!Number.isFinite(metric.value)) {
+        throw new Error(
+          `contentState.metrics[${index}].value must be a number. Use contentState.type=stats for string values`
+        );
       }
       if (metric.unit !== undefined && typeof metric.unit !== "string") {
         throw new Error(`contentState.metrics[${index}].unit must be a string`);
+      }
+      if (metric.color !== undefined) {
+        if (!isNonEmptyString(metric.color)) {
+          throw new Error(`contentState.metrics[${index}].color must be a string`);
+        }
+        if (!liveActivityMetricColors.has(metric.color.trim())) {
+          throw new Error(
+            `contentState.metrics[${index}].color must be one of: ${[
+              ...liveActivityMetricColors,
+            ].join(", ")}`
+          );
+        }
       }
     });
   }
@@ -314,9 +375,9 @@ const validateContentState = (contentState, mode) => {
       return;
     }
 
-    if (effectiveType === "metrics") {
+    if (effectiveType === "metrics" || effectiveType === "stats") {
       if (!hasMetrics) {
-        throw new Error(`metrics ${mode} requires contentState.metrics`);
+        throw new Error(`${effectiveType} ${mode} requires contentState.metrics`);
       }
       return;
     }
@@ -347,9 +408,9 @@ const validateContentState = (contentState, mode) => {
     return;
   }
 
-  if (effectiveType === "metrics") {
+  if (effectiveType === "metrics" || effectiveType === "stats") {
     if (!hasMetrics) {
-      throw new Error(`metrics ${mode} requires contentState.metrics`);
+      throw new Error(`${effectiveType} ${mode} requires contentState.metrics`);
     }
     return;
   }
@@ -898,6 +959,31 @@ program
           : null,
         response?.timestamp ? `Timestamp: ${response.timestamp}` : null,
       ]);
+    } catch (error) {
+      await handleError(error, globalOptions);
+    }
+  });
+
+const metricsCommand = program
+  .command("metrics")
+  .alias("metric")
+  .description("Update widget metric values");
+
+metricsCommand
+  .command("update")
+  .description("Update a widget metric value")
+  .argument("<metric-key>", "Metric key")
+  .argument("<value>", "Metric value")
+  .action(async (metricKey, rawValue) => {
+    const globalOptions = program.opts();
+
+    try {
+      const apiKey = requireApiKey(globalOptions);
+      const client = createClient(apiKey);
+      const value = parseMetricValueArgument(rawValue);
+      const response = await client.metrics.update(metricKey, value);
+
+      outputResult(response, globalOptions, ["Metric value updated."]);
     } catch (error) {
       await handleError(error, globalOptions);
     }

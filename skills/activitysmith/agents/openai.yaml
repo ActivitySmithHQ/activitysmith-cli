@@ -1,4 +1,4 @@
 interface:
   display_name: "ActivitySmith"
-  short_description: "Send push notifications with optional media, channels, redirection, or actions, and run segmented_progress or progress Live Activity lifecycle via ActivitySmith CLI"
-  default_prompt: "Use ActivitySmith scripts to send push notifications (including optional media/channels/redirection/actions, but never media with actions) and to run start/update/end Live Activity lifecycle for segmented_progress or progress types with ACTIVITYSMITH_API_KEY auth."
+  short_description: "Send Push Notifications, update widget metrics, and trigger Live Activities from agents via ActivitySmith CLI"
+  default_prompt: "Use $activitysmith to send Push Notifications, update widget metric values, or run a Live Activity lifecycle through ActivitySmith while you work."
