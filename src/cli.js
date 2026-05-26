@@ -106,6 +106,11 @@ const addContentStateOptions = (command, { includeAutoDismiss } = {}) => {
     .option("--title <title>", "Content state title")
     .option("--subtitle <subtitle>", "Content state subtitle")
     .option("--type <type>", "Content state type")
+    .option("--message <message>", "Alert message")
+    .option("--icon-symbol <symbol>", "Alert SF Symbol name")
+    .option("--icon-color <color>", "Alert icon color")
+    .option("--badge-title <title>", "Alert badge title")
+    .option("--badge-color <color>", "Alert badge color")
     .option(
       "--number-of-steps <number>",
       "Content state number of steps",
@@ -236,9 +241,10 @@ const isNonEmptyString = (value) =>
 const hasOwn = (object, key) =>
   Object.prototype.hasOwnProperty.call(object, key);
 
-const liveActivityMetricColors = new Set([
+const liveActivityColors = new Set([
   "blue",
   "cyan",
+  "gray",
   "green",
   "lime",
   "magenta",
@@ -247,6 +253,8 @@ const liveActivityMetricColors = new Set([
   "red",
   "yellow",
 ]);
+
+const liveActivityColorList = [...liveActivityColors].join(", ");
 
 const validateContentState = (contentState, mode) => {
   const normalizedType =
@@ -261,13 +269,17 @@ const validateContentState = (contentState, mode) => {
     normalizedType !== "segmented_progress" &&
     normalizedType !== "progress" &&
     normalizedType !== "metrics" &&
-    normalizedType !== "stats"
+    normalizedType !== "stats" &&
+    normalizedType !== "alert"
   ) {
     throw new Error(
-      "contentState.type must be one of: segmented_progress, progress, metrics, stats"
+      "contentState.type must be one of: segmented_progress, progress, metrics, stats, alert"
     );
   }
 
+  const hasMessage = hasOwn(contentState, "message");
+  const hasIcon = hasOwn(contentState, "icon");
+  const hasBadge = hasOwn(contentState, "badge");
   const hasNumberOfSteps = hasOwn(contentState, "numberOfSteps");
   const hasCurrentStep = hasOwn(contentState, "currentStep");
   const hasPercentage = hasOwn(contentState, "percentage");
@@ -303,6 +315,41 @@ const validateContentState = (contentState, mode) => {
 
   const hasSegmentedFields = hasNumberOfSteps || hasCurrentStep || hasStepColor;
   const hasProgressFields = hasPercentage || hasValue || hasUpperLimit;
+  const hasAlertFields = hasMessage || hasIcon || hasBadge;
+
+  if (hasIcon) {
+    assertPlainObject(contentState.icon, "contentState.icon");
+    if (!isNonEmptyString(contentState.icon.symbol)) {
+      throw new Error("contentState.icon.symbol is required");
+    }
+    if (contentState.icon.color !== undefined) {
+      if (!isNonEmptyString(contentState.icon.color)) {
+        throw new Error("contentState.icon.color must be a string");
+      }
+      if (!liveActivityColors.has(contentState.icon.color.trim())) {
+        throw new Error(
+          `contentState.icon.color must be one of: ${liveActivityColorList}`
+        );
+      }
+    }
+  }
+
+  if (hasBadge) {
+    assertPlainObject(contentState.badge, "contentState.badge");
+    if (!isNonEmptyString(contentState.badge.title)) {
+      throw new Error("contentState.badge.title is required");
+    }
+    if (contentState.badge.color !== undefined) {
+      if (!isNonEmptyString(contentState.badge.color)) {
+        throw new Error("contentState.badge.color must be a string");
+      }
+      if (!liveActivityColors.has(contentState.badge.color.trim())) {
+        throw new Error(
+          `contentState.badge.color must be one of: ${liveActivityColorList}`
+        );
+      }
+    }
+  }
 
   if (hasSegmentedFields && hasProgressFields) {
     throw new Error(
@@ -313,6 +360,15 @@ const validateContentState = (contentState, mode) => {
   if (hasMetrics && (hasSegmentedFields || hasProgressFields)) {
     throw new Error(
       "Do not mix metrics fields with segmented_progress or progress fields in the same contentState"
+    );
+  }
+
+  if (
+    hasAlertFields &&
+    (hasMetrics || hasSegmentedFields || hasProgressFields || hasStepColor)
+  ) {
+    throw new Error(
+      "Do not mix alert fields with metrics, segmented_progress, or progress fields in the same contentState"
     );
   }
 
@@ -348,11 +404,9 @@ const validateContentState = (contentState, mode) => {
         if (!isNonEmptyString(metric.color)) {
           throw new Error(`contentState.metrics[${index}].color must be a string`);
         }
-        if (!liveActivityMetricColors.has(metric.color.trim())) {
+        if (!liveActivityColors.has(metric.color.trim())) {
           throw new Error(
-            `contentState.metrics[${index}].color must be one of: ${[
-              ...liveActivityMetricColors,
-            ].join(", ")}`
+            `contentState.metrics[${index}].color must be one of: ${liveActivityColorList}`
           );
         }
       }
@@ -378,6 +432,13 @@ const validateContentState = (contentState, mode) => {
     if (effectiveType === "metrics" || effectiveType === "stats") {
       if (!hasMetrics) {
         throw new Error(`${effectiveType} ${mode} requires contentState.metrics`);
+      }
+      return;
+    }
+
+    if (effectiveType === "alert") {
+      if (!isNonEmptyString(contentState.message)) {
+        throw new Error(`alert ${mode} requires contentState.message`);
       }
       return;
     }
@@ -415,9 +476,16 @@ const validateContentState = (contentState, mode) => {
     return;
   }
 
-  if (!hasSegmentedFields && !hasProgressFields && !hasMetrics) {
+  if (effectiveType === "alert") {
+    if (!isNonEmptyString(contentState.message)) {
+      throw new Error(`alert ${mode} requires contentState.message`);
+    }
+    return;
+  }
+
+  if (!hasSegmentedFields && !hasProgressFields && !hasMetrics && !hasAlertFields) {
     throw new Error(
-      `contentState for activity ${mode} must include metrics, segmented_progress fields, or progress fields`
+      `contentState for activity ${mode} must include metrics, segmented_progress fields, progress fields, or alert fields`
     );
   }
 
@@ -435,6 +503,10 @@ const validateContentState = (contentState, mode) => {
     throw new Error(
       `progress ${mode} requires contentState.percentage, or contentState.value with contentState.upperLimit`
     );
+  }
+
+  if (hasAlertFields && !isNonEmptyString(contentState.message)) {
+    throw new Error(`alert ${mode} requires contentState.message`);
   }
 };
 
@@ -560,6 +632,30 @@ const buildContentStateFromOptions = (options) => {
     contentState.type = options.type;
   }
 
+  if (options.message !== undefined) {
+    contentState.message = options.message;
+  }
+
+  if (options.iconSymbol !== undefined || options.iconColor !== undefined) {
+    contentState.icon = {};
+    if (options.iconSymbol !== undefined) {
+      contentState.icon.symbol = options.iconSymbol;
+    }
+    if (options.iconColor !== undefined) {
+      contentState.icon.color = options.iconColor;
+    }
+  }
+
+  if (options.badgeTitle !== undefined || options.badgeColor !== undefined) {
+    contentState.badge = {};
+    if (options.badgeTitle !== undefined) {
+      contentState.badge.title = options.badgeTitle;
+    }
+    if (options.badgeColor !== undefined) {
+      contentState.badge.color = options.badgeColor;
+    }
+  }
+
   if (options.numberOfSteps !== undefined) {
     contentState.numberOfSteps = options.numberOfSteps;
   }
@@ -623,6 +719,9 @@ const toApiContentState = (contentState) => {
   const mapped = {};
   for (const [key, value] of Object.entries(contentState)) {
     if (value === undefined) {
+      continue;
+    }
+    if (key === "color" && contentState.type === "alert") {
       continue;
     }
     if (keyMap[key]) {
