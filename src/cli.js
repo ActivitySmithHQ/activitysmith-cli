@@ -721,9 +721,6 @@ const toApiContentState = (contentState) => {
     if (value === undefined) {
       continue;
     }
-    if (key === "color" && contentState.type === "alert") {
-      continue;
-    }
     if (keyMap[key]) {
       mapped[keyMap[key]] = value;
     } else {
@@ -1056,7 +1053,6 @@ program
         response?.devicesNotified !== undefined
           ? `Devices notified: ${response.devicesNotified}`
           : null,
-        response?.timestamp ? `Timestamp: ${response.timestamp}` : null,
       ]);
     } catch (error) {
       await handleError(error, globalOptions);
