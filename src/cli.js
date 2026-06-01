@@ -97,6 +97,37 @@ const normalizeHttpsUrl = (value, label) => {
   return parsed.toString();
 };
 
+const normalizeUrlWithSchemes = (value, label, schemes) => {
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error(`${label} must be a non-empty string`);
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(value.trim());
+  } catch {
+    throw new Error(`${label} must be a valid URL`);
+  }
+
+  const allowedProtocols = schemes.map((scheme) => `${scheme}:`);
+  if (!allowedProtocols.includes(parsed.protocol)) {
+    throw new Error(`${label} must use ${schemes.join(" or ")}`);
+  }
+
+  return parsed.toString();
+};
+
+const normalizeActionUrl = (value, label, type) => {
+  if (type === "open_url") {
+    return normalizeUrlWithSchemes(value, label, ["https", "shortcuts"]);
+  }
+
+  return normalizeHttpsUrl(value, label);
+};
+
+const normalizeOpenUrl = (value, label) =>
+  normalizeUrlWithSchemes(value, label, ["https", "shortcuts"]);
+
 const addContentStateOptions = (command, { includeAutoDismiss } = {}) => {
   command
     .option("--content-state <json>", "Content state as JSON string")
@@ -107,10 +138,10 @@ const addContentStateOptions = (command, { includeAutoDismiss } = {}) => {
     .option("--subtitle <subtitle>", "Content state subtitle")
     .option("--type <type>", "Content state type")
     .option("--message <message>", "Alert message")
-    .option("--icon-symbol <symbol>", "Alert SF Symbol name")
-    .option("--icon-color <color>", "Alert icon color")
-    .option("--badge-title <title>", "Alert badge title")
-    .option("--badge-color <color>", "Alert badge color")
+    .option("--icon-symbol <symbol>", "SF Symbol name")
+    .option("--icon-color <color>", "Icon color")
+    .option("--badge-title <title>", "Badge title")
+    .option("--badge-color <color>", "Badge color")
     .option(
       "--number-of-steps <number>",
       "Content state number of steps",
@@ -529,7 +560,7 @@ const parseAction = (value, label) => {
   const action = {
     title: value.title.trim(),
     type: normalizedType,
-    url: normalizeHttpsUrl(value.url, `${label}.url`),
+    url: normalizeActionUrl(value.url, `${label}.url`, normalizedType),
   };
 
   if (value.method !== undefined) {
@@ -1003,7 +1034,7 @@ program
     "--media <url>",
     "HTTPS URL for image, audio, or video shown when the notification is expanded"
   )
-  .option("--redirection <url>", "HTTPS URL opened when notification is tapped")
+  .option("--redirection <url>", "HTTPS or shortcuts:// URL opened when notification is tapped")
   .option("--actions <json>", "Actions JSON array (max 4)")
   .option("--actions-file <path>", "Path to actions JSON array file")
   .option(
@@ -1034,7 +1065,7 @@ program
               : undefined,
           redirection:
             options.redirection !== undefined
-              ? normalizeHttpsUrl(options.redirection, "redirection")
+              ? normalizeOpenUrl(options.redirection, "redirection")
               : undefined,
           actions,
         },
