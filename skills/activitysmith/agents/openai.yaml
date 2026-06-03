@@ -1,4 +1,4 @@
 interface:
   display_name: "ActivitySmith"
-  short_description: "Send Push Notifications, run Apple Shortcuts from notification taps or actions, update widget metrics, and manage Live Activities from agents."
-  default_prompt: "Use $activitysmith when you need to notify the user, run an Apple Shortcut from a notification, update a widget metric, or keep progress visible with a Live Activity."
+  short_description: "Send Push Notifications, include notification taps or actions that run a specific iPhone Shortcut, and manage Live Activities from agents."
+  default_prompt: "Use $activitysmith when you need to notify the user, include a specific iPhone Shortcut in a notification tap or action, or keep progress visible with a Live Activity."

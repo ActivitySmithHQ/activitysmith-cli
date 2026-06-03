@@ -1,6 +1,6 @@
 ---
 name: activitysmith
-description: Send ActivitySmith Push Notifications, run Apple Shortcuts from notification taps or actions, update widget metrics, and manage Live Activities from coding agents through the ActivitySmith CLI.
+description: Send ActivitySmith Push Notifications, include notification taps or actions that run a specific iPhone Shortcut, and manage Live Activities from coding agents through the ActivitySmith CLI.
 ---
 
 # ActivitySmith
@@ -10,6 +10,7 @@ Use this skill when the user wants an iPhone/iPad signal from an agent:
 - "notify me when done"
 - "send me a push notification"
 - "open this Shortcut when I tap the notification"
+- "open ChatGPT when I tap the notification"
 - "keep progress visible while you work"
 - "show this metric on my Lock Screen"
 - "tell me if you get blocked"
@@ -33,7 +34,7 @@ export ACTIVITYSMITH_API_KEY="..."
 ## Pick The Right Signal
 
 - Push Notification: one important event, completion, blocker, review request, or handoff.
-- Push Notification with redirection: tapping the notification should open a URL or run an Apple Shortcut.
+- Push Notification with redirection: tapping the notification should open a URL or run a specific Shortcut that already exists on the user's iPhone.
 - Push Notification with actions: long-press should show up to 4 buttons.
 - Live Activity: progress should stay visible while work is ongoing.
 - Widget metric: one stable value should stay visible after the task ends.
@@ -44,7 +45,7 @@ Default to a Push Notification for "notify me when done." Use a Live Activity on
 ## URL And Action Rules
 
 - `redirection` / `--redirection`: opens when the notification is tapped.
-- `open_url` action: opens an HTTPS URL or runs an Apple Shortcut with `shortcuts://`.
+- `open_url` action: opens an HTTPS URL or runs a specific iPhone Shortcut with a `shortcuts://run-shortcut?name=...` URL.
 - `webhook` action: ActivitySmith backend calls an HTTPS endpoint.
 - `media` must be HTTPS and cannot be combined with actions.
 - Keep action labels short. iOS buttons have limited space.
@@ -63,15 +64,26 @@ Use this when the user says "notify me when done" or when a long task completes.
   -m "Your agent finished the task."
 ```
 
-### Notify And Run An Apple Shortcut On Tap
+### Notify With A Shortcut Tap Target
 
-Use this when the user wants tapping the notification to run an iPhone Shortcut.
+Use this when tapping the notification should run a specific Shortcut that already exists on the user's iPhone.
 
 ```bash
 ./skills/activitysmith/scripts/send_push.sh \
   -t "Task finished" \
   -m "Tap to run Test." \
   -r "shortcuts://run-shortcut?name=Test"
+```
+
+### Notify And Open ChatGPT On Tap
+
+Use this when the user wants to continue with a coding agent from the ChatGPT app on iPhone. The Shortcut must already exist on the user's iPhone and should open the ChatGPT app.
+
+```bash
+./skills/activitysmith/scripts/send_push.sh \
+  -t "Input needed" \
+  -m "Tap to continue in ChatGPT." \
+  -r "shortcuts://run-shortcut?name=OpenChatGPT"
 ```
 
 ### Notify With Action Buttons
@@ -126,7 +138,7 @@ activity_id="$(./skills/activitysmith/scripts/start_activity.sh \
 
 ### Add A Shortcut Button To A Live Activity
 
-Use this when a Live Activity button should run an iPhone Shortcut or open a local app through Shortcuts.
+Use this when tapping a Live Activity button should run a specific iPhone Shortcut or open a local app through a Shortcut.
 
 ```bash
 ./skills/activitysmith/scripts/start_activity.sh \

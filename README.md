@@ -41,13 +41,13 @@ Use it for prompts like:
 
 - "Notify me when you're done."
 - "Send me a push notification if you get blocked."
-- "When the task finishes, tap should run my Test Shortcut."
+- "When the task finishes, the notification tap should run my Test Shortcut."
 - "Show progress on my Lock Screen while you work."
 
 The skill maps those requests to the CLI:
 
 - Push Notifications for completion, blockers, and review requests
-- `shortcuts://` redirection for Apple Shortcuts
+- `shortcuts://` redirection for a specific iPhone Shortcut
 - action buttons for follow-up links or Shortcut buttons
 - Live Activities for long-running progress
 - widget metrics for values that should stay visible
@@ -55,7 +55,7 @@ The skill maps those requests to the CLI:
 Install the public skill from this repo:
 
 ```bash
-npx skills add ActivitySmithHQ/activitysmith-cli --skill activitysmith
+npx -y skills@latest add ActivitySmithHQ/activitysmith-cli --skill activitysmith
 ```
 
 Skill path in this repo:
@@ -119,7 +119,7 @@ What will work:
   <img src="https://cdn.activitysmith.com/features/actionable-push-notifications-2.png" alt="Actionable push notification example" width="680" />
 </p>
 
-Push notification `--redirection` and `--actions` are optional. Use them to open HTTPS URLs, run Apple Shortcuts with `shortcuts://` URLs, or trigger backend webhook workflows.
+Push notification `--redirection` and `--actions` are optional. Use them to open HTTPS URLs, run a specific iPhone Shortcut with a `shortcuts://run-shortcut?name=...` URL, or trigger backend webhook workflows.
 Webhooks are executed by the ActivitySmith backend.
 
 ```bash
