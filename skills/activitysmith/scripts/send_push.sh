@@ -13,7 +13,7 @@ Optional:
   -s  Push subtitle
   -c  Comma-separated channel slugs (example: "devs,ops")
   -M  Rich media HTTPS URL (image, audio, or video)
-  -r  Redirection HTTPS URL (opened on notification tap)
+  -r  Redirection HTTPS or shortcuts:// URL (opened on notification tap)
   -a  Actions JSON array string (max 4 actions)
   -A  Path to actions JSON array file
 USAGE

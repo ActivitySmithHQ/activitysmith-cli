@@ -1,99 +1,105 @@
 ---
 name: activitysmith
-description: Send ActivitySmith Push Notifications, update widget metrics, and run Live Activity start/update/end lifecycle from coding agents through the bundled ActivitySmith CLI scripts. Use when an agent should send milestone, blocker, review, or completion alerts to iPhone or iPad, update a Lock Screen widget value, or keep long-running work visible step by step with Live Activities.
+description: Send ActivitySmith Push Notifications, run Apple Shortcuts from notification taps or actions, update widget metrics, and manage Live Activities from coding agents through the ActivitySmith CLI.
 ---
 
 # ActivitySmith
 
-Use this skill to let Codex, Claude, or any skills-compatible agent send:
+Use this skill when the user wants an iPhone/iPad signal from an agent:
 
-- Push Notifications for milestone, blocker, review, and completion alerts
-- Widget metrics for values that should stay visible on the Lock Screen
-- Live Activities for step-by-step status during long-running work
+- "notify me when done"
+- "send me a push notification"
+- "open this Shortcut when I tap the notification"
+- "keep progress visible while you work"
+- "show this metric on my Lock Screen"
+- "tell me if you get blocked"
 
-Install the ActivitySmith skill, then tell your agent like Claude or Codex to keep you updated while it works. It can send Push Notifications for milestone, blocker, and completion alerts, update widget metric values, and use Live Activities for step-by-step status on your iOS device(s) during long-running tasks.
+The CLI is the tool. This skill is the intent mapping and recipe layer.
 
 ## Requirements
 
-- Ensure `activitysmith` is available in `PATH`
-- Set `ACTIVITYSMITH_API_KEY` in the shell, or in `skills/activitysmith/.env`
-- Use the bundled scripts in `./skills/activitysmith/scripts/`
-- Use `activitysmith metrics update` directly for widget metric values
-- Run any bundled script with `-h` when you need the full flag reference
+- `activitysmith` must be available in `PATH`.
+- `ACTIVITYSMITH_API_KEY` must be set in the shell or in `skills/activitysmith/.env`.
+- Use bundled scripts from `./skills/activitysmith/scripts/` when available.
+- Use direct `activitysmith ...` commands for simple one-liners or widget metrics.
+- Examples below assume the skill is installed at `./skills/activitysmith`. If not, replace that prefix with the actual skill directory.
 
-## Choose The Right Signal
-
-- Use a Push Notification when one alert is enough
-- Use a widget metric when one value should stay visible after the task ends
-- Use a Live Activity when work will move through stages or progress over time
-- Use channels when only some devices or teammates should receive the update
-- Prefer concise human copy: short title, concrete subtitle, clear message
-
-## Push Notifications
-
-Use Push Notifications for one-off alerts.
-
-Choose one of these patterns:
-
-- Use a basic push for milestone, blocker, or completion updates
-- Use a rich push when the notification should preview an image, audio file, or video
-- Use an actionable push when someone should be able to open a URL or trigger a webhook from the notification
-
-### Send A Basic Push Notification
+If auth is missing, tell the user to set:
 
 ```bash
-./skills/activitysmith/scripts/send_push.sh \
-  -t "Build Failed" \
-  -m "CI pipeline failed on main branch"
+export ACTIVITYSMITH_API_KEY="..."
 ```
 
-### Send A Rich Push Notification
+## Pick The Right Signal
+
+- Push Notification: one important event, completion, blocker, review request, or handoff.
+- Push Notification with redirection: tapping the notification should open a URL or run an Apple Shortcut.
+- Push Notification with actions: long-press should show up to 4 buttons.
+- Live Activity: progress should stay visible while work is ongoing.
+- Widget metric: one stable value should stay visible after the task ends.
+- Channels: only specific teammates/devices should receive the update.
+
+Default to a Push Notification for "notify me when done." Use a Live Activity only when the user asks for progress or the task is long-running enough that progress updates matter.
+
+## URL And Action Rules
+
+- `redirection` / `--redirection`: opens when the notification is tapped.
+- `open_url` action: opens an HTTPS URL or runs an Apple Shortcut with `shortcuts://`.
+- `webhook` action: ActivitySmith backend calls an HTTPS endpoint.
+- `media` must be HTTPS and cannot be combined with actions.
+- Keep action labels short. iOS buttons have limited space.
+- Live Activities support one action button. Push Notifications support up to 4 actions.
+- Encode Shortcut names with spaces: `Open Jarvis` becomes `Open%20Jarvis`.
+
+## Recipes
+
+### Notify When Done
+
+Use this when the user says "notify me when done" or when a long task completes.
 
 ```bash
 ./skills/activitysmith/scripts/send_push.sh \
-  -t "Homepage ready" \
-  -m "Your agent finished the redesign." \
-  -M "https://cdn.example.com/output/homepage-v2.png" \
+  -t "Task finished" \
+  -m "Your agent finished the task."
+```
+
+### Notify And Run An Apple Shortcut On Tap
+
+Use this when the user wants tapping the notification to run an iPhone Shortcut.
+
+```bash
+./skills/activitysmith/scripts/send_push.sh \
+  -t "Task finished" \
+  -m "Tap to run Test." \
+  -r "shortcuts://run-shortcut?name=Test"
+```
+
+### Notify With Action Buttons
+
+Use this when the notification should offer multiple follow-up actions.
+
+```bash
+./skills/activitysmith/scripts/send_push.sh \
+  -t "Build failed" \
+  -m "CI failed on main." \
+  -a '[{"title":"Open Run","type":"open_url","url":"https://github.com/acme/web/actions/runs/123456789"},{"title":"Chat with Jarvis","type":"open_url","url":"shortcuts://run-shortcut?name=Jarvis"}]'
+```
+
+### Send A Rich Push With A Tap Target
+
+Use this when the notification should preview an image, audio file, or video.
+
+```bash
+./skills/activitysmith/scripts/send_push.sh \
+  -t "Preview ready" \
+  -m "Open the generated screenshot." \
+  -M "https://cdn.example.com/output/homepage.png" \
   -r "https://github.com/acme/web/pull/482"
 ```
 
-### Send An Actionable Push Notification
+### Start, Update, And End A Live Activity
 
-```bash
-./skills/activitysmith/scripts/send_push.sh \
-  -t "Build Failed" \
-  -m "CI pipeline failed on main branch" \
-  -r "https://github.com/org/repo/actions/runs/123456789" \
-  -a '[{"title":"Open Failing Run","type":"open_url","url":"https://github.com/org/repo/actions/runs/123456789"},{"title":"Create Incident","type":"webhook","url":"https://hooks.example.com/incidents/create","method":"POST","body":{"service":"payments-api","severity":"high"}}]'
-```
-
-### Follow These Push Rules
-
-- Use `-c "channel-a,channel-b"` to target specific channels
-- Use `-M` only with an `https://` media URL
-- Combine `-M` with `-r` when preview and tap destination should differ
-- Never combine `-M` with `-a` or `-A`
-- Keep actions to 4 or fewer
-- Use `open_url` or `webhook` for action type
-- Prefer `-A /path/to/actions.json` when actions get long
-
-## Live Activities
-
-Use Live Activities for ongoing work.
-
-Follow the same lifecycle every time:
-
-1. Start the activity once
-2. Capture the returned Activity ID
-3. Update the same Activity ID at meaningful milestones
-4. End the same Activity ID when work finishes or stops
-
-### Pick A Live Activity Type
-
-- Use `segmented_progress` for jobs tracked in stages or steps
-- Use `progress` for jobs tracked as a percentage or numeric range
-
-### Start, Update, And End A Segmented Live Activity
+Use this when progress should stay visible.
 
 ```bash
 activity_id="$(./skills/activitysmith/scripts/start_activity.sh \
@@ -118,85 +124,52 @@ activity_id="$(./skills/activitysmith/scripts/start_activity.sh \
   --auto-dismiss 2
 ```
 
-### Start, Update, And End A Progress Live Activity
+### Add A Shortcut Button To A Live Activity
+
+Use this when a Live Activity button should run an iPhone Shortcut or open a local app through Shortcuts.
 
 ```bash
-activity_id="$(./skills/activitysmith/scripts/start_activity.sh \
-  --title "EV Charging" \
-  --subtitle "Added 30 mi range" \
-  --type "progress" \
-  --percentage 15 \
-  --id-only)"
-
-./skills/activitysmith/scripts/update_activity.sh \
-  --activity-id "$activity_id" \
-  --title "EV Charging" \
-  --subtitle "Added 120 mi range" \
-  --percentage 60
-
-./skills/activitysmith/scripts/end_activity.sh \
-  --activity-id "$activity_id" \
-  --title "EV Charging" \
-  --subtitle "Added 200 mi range" \
-  --percentage 100 \
-  --auto-dismiss 2
+./skills/activitysmith/scripts/start_activity.sh \
+  --title "Deploying payments-api" \
+  --subtitle "Running migrations" \
+  --type "segmented_progress" \
+  --steps 5 \
+  --current 3 \
+  --action '{"title":"Chat with Jarvis","type":"open_url","url":"shortcuts://run-shortcut?name=Jarvis"}'
 ```
 
-### Follow These Live Activity Rules
+### Ask For Review Or Report A Blocker
 
-- Use `--id-only` on start when chaining commands
-- Use `--steps` and `--current` for `segmented_progress`
-- Use `--percentage`, or `--value` with `--upper-limit`, for `progress`
-- Use `--action` or `--action-file` when the Live Activity should open a URL or trigger a webhook
-- Never mix segmented and progress fields in the same command
-- Never call update or end without a valid Activity ID from start
+Use this when the agent needs human input.
 
-## Widget Metrics
+```bash
+./skills/activitysmith/scripts/send_push.sh \
+  -t "Input needed" \
+  -m "I hit a blocker and need your decision."
+```
 
-Use widget metrics for values that should stay visible after a task finishes.
+### Update A Widget Metric
+
+Use this when a stable metric should stay visible on the Lock Screen.
 
 ```bash
 activitysmith metrics update deploy.success_rate 99.9
 ```
 
-String values work too.
+String values work too:
 
 ```bash
 activitysmith metrics update prod.status healthy
 ```
 
-### Follow These Widget Rules
+## Agent Behavior
 
-- Use a stable metric key created in the ActivitySmith web app
-- Use numbers for counters, percentages, currency, and units
-- Use short strings for states like `healthy`, `blocked`, or `paused`
-
-### Add A Live Activity Action
-
-```bash
-activity_id="$(./skills/activitysmith/scripts/start_activity.sh \
-  --title "Deploying payments-api" \
-  --subtitle "Running database migrations" \
-  --type "segmented_progress" \
-  --steps 5 \
-  --current 3 \
-  --action '{"title":"Open Workflow","type":"open_url","url":"https://github.com/acme/payments-api/actions/runs/1234567890"}' \
-  --id-only)"
-
-./skills/activitysmith/scripts/update_activity.sh \
-  --activity-id "$activity_id" \
-  --title "Reindexing product search" \
-  --subtitle "Shard 7 of 12" \
-  --steps 12 \
-  --current 7 \
-  --action '{"title":"Pause Reindex","type":"webhook","url":"https://ops.example.com/hooks/search/reindex/pause","method":"POST","body":{"job_id":"reindex-2026-03-19"}}'
-```
-
-## Default Agent Behavior
-
-- Send a Push Notification for blockers, completion, review requests, or any single important event
-- Start a Live Activity when the user wants visible progress during a long-running task
-- Update a Live Activity only when progress meaningfully changes
-- End the Live Activity when the task is done, paused, blocked, or handed off
-- Prefer Push Notifications with media for screenshots, preview images, videos, or audio
-- Prefer actionable Push Notifications when the user should be able to open a link or trigger follow-up directly from the notification
+- Be sparse. Send signals at meaningful moments, not every small step.
+- Use clear human titles: "Task finished", "Input needed", "Build failed".
+- Mention the concrete next step in the message.
+- For Shortcut taps, use `--redirection`.
+- For Shortcut buttons, use an `open_url` action with a `shortcuts://` URL.
+- For long-running progress, start one Live Activity, update it, then end it.
+- Capture the Activity ID when using start/update/end.
+- Do not expose API keys, tokens, or secrets in titles, messages, action URLs, or webhook bodies.
+- If a command fails, report the error and do not retry repeatedly without a change.

@@ -5,7 +5,7 @@ CLI wrapper for the ActivitySmith API using the official Node SDK.
 ## Table of Contents
 
 - [Install](#install)
-- [Install Skill (Codex/Claude/Other Skills-Compatible Agents)](#install-skill-codexclaudeother-skills-compatible-agents)
+- [Agent Skill](#agent-skill)
 - [Auth](#auth)
 - [Push Notifications](#push-notifications)
   - [Send Push Notification](#send-push-notification)
@@ -29,7 +29,28 @@ CLI wrapper for the ActivitySmith API using the official Node SDK.
 npm install -g activitysmith-cli
 ```
 
-## Install Skill (Codex/Claude/Other Skills-Compatible Agents)
+## Agent Skill
+
+<p align="center">
+  <img src="https://cdn.activitysmith.com/features/apple-shortcut-actions.png" alt="ActivitySmith Push Notification Actions with an Apple Shortcut action" width="680" />
+</p>
+
+The ActivitySmith skill helps coding agents decide when and how to notify you.
+
+Use it for prompts like:
+
+- "Notify me when you're done."
+- "Send me a push notification if you get blocked."
+- "When the task finishes, tap should run my Test Shortcut."
+- "Show progress on my Lock Screen while you work."
+
+The skill maps those requests to the CLI:
+
+- Push Notifications for completion, blockers, and review requests
+- `shortcuts://` redirection for Apple Shortcuts
+- action buttons for follow-up links or Shortcut buttons
+- Live Activities for long-running progress
+- widget metrics for values that should stay visible
 
 Install the public skill from this repo:
 
@@ -43,7 +64,7 @@ Skill path in this repo:
 skills/activitysmith
 ```
 
-The skill is agent-neutral and uses `ACTIVITYSMITH_API_KEY` auth plus the same CLI commands shown below.
+The skill is agent-neutral and recipe-driven. It uses `ACTIVITYSMITH_API_KEY` auth plus the same CLI commands shown below.
 
 ## Auth
 
