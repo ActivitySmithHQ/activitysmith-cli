@@ -98,7 +98,7 @@ What will work:
   <img src="https://cdn.activitysmith.com/features/actionable-push-notifications-2.png" alt="Actionable push notification example" width="680" />
 </p>
 
-Actionable push notifications can open a URL on tap or trigger actions when someone long-presses the notification.
+Push notification `--redirection` and `--actions` are optional. Use them to open HTTPS URLs, run Apple Shortcuts with `shortcuts://` URLs, or trigger backend webhook workflows.
 Webhooks are executed by the ActivitySmith backend.
 
 ```bash
@@ -111,6 +111,11 @@ activitysmith push \
       "title": "Open Failing Run",
       "type": "open_url",
       "url": "https://github.com/org/repo/actions/runs/123456789"
+    },
+    {
+      "title": "Chat with Jarvis",
+      "type": "open_url",
+      "url": "shortcuts://run-shortcut?name=Jarvis"
     },
     {
       "title": "Create Incident",
@@ -287,8 +292,11 @@ activitysmith activity end-stream prod-web-1 \
 
 ### Live Activity Action
 
-Live Activities can include one optional action button. Use it to open a URL from the Live Activity or trigger a backend webhook.
-For Alert Live Activities, set `color` in `--content-state` to tint the action button. `icon.color` and `badge.color` only affect the icon and badge.
+Live Activities can include one optional action button.
+
+- `open_url`: open an HTTPS URL.
+- `open_url` with a `shortcuts://` URL: run an Apple Shortcut, for example to open an app.
+- `webhook`: trigger a backend GET/POST workflow.
 
 <p align="center">
   <img
@@ -312,9 +320,27 @@ activitysmith activity stream prod-web-1 \
     ]
   }' \
   --action '{
-    "title": "Open Dashboard",
+    "title": "Dashboard",
     "type": "open_url",
     "url": "https://ops.example.com/servers/prod-web-1"
+  }'
+```
+
+#### Apple Shortcut action
+
+```bash
+activitysmith activity stream deploy-payments-api \
+  --content-state '{
+    "title": "Deploying payments-api",
+    "subtitle": "Running database migrations",
+    "type": "segmented_progress",
+    "numberOfSteps": 5,
+    "currentStep": 3
+  }' \
+  --action '{
+    "title": "Chat with Jarvis",
+    "type": "open_url",
+    "url": "shortcuts://run-shortcut?name=Jarvis"
   }'
 ```
 
