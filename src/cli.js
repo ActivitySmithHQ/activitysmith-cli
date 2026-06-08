@@ -37,6 +37,22 @@ const parseNumberOption = (label) => (value) => {
   return parsed;
 };
 
+const parseBooleanOption = (label) => (value) => {
+  if (typeof value !== "string") {
+    throw new InvalidArgumentError(`${label} must be true or false`);
+  }
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true") {
+    return true;
+  }
+  if (normalized === "false") {
+    return false;
+  }
+
+  throw new InvalidArgumentError(`${label} must be true or false`);
+};
+
 const parseChannelsOption = (value) => {
   if (typeof value !== "string") {
     throw new InvalidArgumentError("channels must be a comma-separated string");
@@ -166,6 +182,16 @@ const addContentStateOptions = (command, { includeAutoDismiss } = {}) => {
       "--upper-limit <number>",
       "Content state upper limit",
       parseNumberOption("upper-limit")
+    )
+    .option(
+      "--duration-seconds <number>",
+      "Timer duration in seconds",
+      parseNumberOption("duration-seconds")
+    )
+    .option(
+      "--counts-down <boolean>",
+      "Set to false for an elapsed timer",
+      parseBooleanOption("counts-down")
     )
     .option("--color <color>", "Content state color")
     .option("--step-color <color>", "Content state step color");
@@ -301,10 +327,11 @@ const validateContentState = (contentState, mode) => {
     normalizedType !== "progress" &&
     normalizedType !== "metrics" &&
     normalizedType !== "stats" &&
-    normalizedType !== "alert"
+    normalizedType !== "alert" &&
+    normalizedType !== "timer"
   ) {
     throw new Error(
-      "contentState.type must be one of: segmented_progress, progress, metrics, stats, alert"
+      "contentState.type must be one of: segmented_progress, progress, metrics, stats, alert, timer"
     );
   }
 
@@ -318,6 +345,9 @@ const validateContentState = (contentState, mode) => {
   const hasUpperLimit = hasOwn(contentState, "upperLimit");
   const hasStepColor = hasOwn(contentState, "stepColor");
   const hasMetrics = hasOwn(contentState, "metrics");
+  const hasDurationSeconds = hasOwn(contentState, "durationSeconds");
+  const hasCountsDown = hasOwn(contentState, "countsDown");
+  const hasTimerFields = hasDurationSeconds || hasCountsDown;
 
   if (hasValue !== hasUpperLimit) {
     throw new Error(
@@ -342,6 +372,14 @@ const validateContentState = (contentState, mode) => {
 
   if (hasUpperLimit && contentState.upperLimit <= 0) {
     throw new Error("contentState.upperLimit must be greater than 0");
+  }
+
+  if (hasDurationSeconds && contentState.durationSeconds <= 0) {
+    throw new Error("contentState.durationSeconds must be greater than 0");
+  }
+
+  if (hasCountsDown && typeof contentState.countsDown !== "boolean") {
+    throw new Error("contentState.countsDown must be true or false");
   }
 
   const hasSegmentedFields = hasNumberOfSteps || hasCurrentStep || hasStepColor;
@@ -474,6 +512,15 @@ const validateContentState = (contentState, mode) => {
       return;
     }
 
+    if (effectiveType === "timer") {
+      if (!hasDurationSeconds && contentState.countsDown !== false) {
+        throw new Error(
+          `timer ${mode} requires contentState.durationSeconds, or contentState.countsDown=false`
+        );
+      }
+      return;
+    }
+
     if (!hasPercentage && !hasValue) {
       throw new Error(
         `progress ${mode} requires contentState.percentage, or contentState.value with contentState.upperLimit`
@@ -514,9 +561,19 @@ const validateContentState = (contentState, mode) => {
     return;
   }
 
-  if (!hasSegmentedFields && !hasProgressFields && !hasMetrics && !hasAlertFields) {
+  if (effectiveType === "timer") {
+    return;
+  }
+
+  if (
+    !hasSegmentedFields &&
+    !hasProgressFields &&
+    !hasMetrics &&
+    !hasAlertFields &&
+    !hasTimerFields
+  ) {
     throw new Error(
-      `contentState for activity ${mode} must include metrics, segmented_progress fields, progress fields, or alert fields`
+      `contentState for activity ${mode} must include metrics, segmented_progress fields, progress fields, alert fields, or timer fields`
     );
   }
 
@@ -707,6 +764,14 @@ const buildContentStateFromOptions = (options) => {
     contentState.upperLimit = options.upperLimit;
   }
 
+  if (options.durationSeconds !== undefined) {
+    contentState.durationSeconds = options.durationSeconds;
+  }
+
+  if (options.countsDown !== undefined) {
+    contentState.countsDown = options.countsDown;
+  }
+
   if (options.color !== undefined) {
     contentState.color = options.color;
   }
@@ -745,6 +810,8 @@ const toApiContentState = (contentState) => {
     upperLimit: "upper_limit",
     stepColor: "step_color",
     autoDismissMinutes: "auto_dismiss_minutes",
+    durationSeconds: "duration_seconds",
+    countsDown: "counts_down",
   };
 
   const mapped = {};

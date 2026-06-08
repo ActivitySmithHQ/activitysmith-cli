@@ -517,9 +517,13 @@ Or use flags to build the rest of the payload:
 - `--percentage <number>`
 - `--value <number>`
 - `--upper-limit <number>`
+- `--duration-seconds <number>`
+- `--counts-down <true|false>`
 - `--color <color>`
 - `--step-color <color>`
 - `--auto-dismiss-minutes <number>`
+
+For `timer`, use `--duration-seconds` for a countdown. To start at 00:00 and count up, use `--counts-down false` and leave out `--duration-seconds`.
 
 Live Activity action options:
 
@@ -537,10 +541,10 @@ Widget metric options:
 
 Required fields:
 
-- `activity stream`: `--title`, `--type`, plus `--metrics`, `--number-of-steps` and `--current-step`, `--percentage`, or `--value` with `--upper-limit`
-- `activity start`: `--title`, `--type`, plus `--metrics`, `--number-of-steps` and `--current-step`, `--percentage`, or `--value` with `--upper-limit`
-- `activity update`: `--title`, plus `--metrics`, `--current-step`, `--percentage`, or `--value` with `--upper-limit`
-- `activity end`: `--title`, plus `--metrics`, `--current-step`, `--percentage`, or `--value` with `--upper-limit`
+- `activity stream`: `--title`, `--type`, plus `--metrics`, `--number-of-steps` and `--current-step`, `--percentage`, `--value` with `--upper-limit`, or timer fields
+- `activity start`: `--title`, `--type`, plus `--metrics`, `--number-of-steps` and `--current-step`, `--percentage`, `--value` with `--upper-limit`, or timer fields
+- `activity update`: `--title`, plus `--metrics`, `--current-step`, `--percentage`, `--value` with `--upper-limit`, or timer fields
+- `activity end`: `--title`, plus `--metrics`, `--current-step`, `--percentage`, `--value` with `--upper-limit`, or timer fields
 - `activity end-stream`: no content state is required, but if you provide one it follows the same rules as `activity end`
 
 ## Output
