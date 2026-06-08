@@ -163,13 +163,14 @@ activitysmith push \
 
 ## Live Activities
 
-There are five types of Live Activities:
+There are six types of Live Activities:
 
 - `stats`: best for showing business numbers side by side, such as revenue, sales, new users, conversion, refunds, or any other value you want visible at a glance
 - `metrics`: best for live percentage values that change often, like server CPU, memory usage, disk usage, or error rate
 - `segmented_progress`: best for anything that moves through clear stages, like deployments, onboarding flows, backups, ETL pipelines, migrations, and AI agent runs
 - `progress`: best for tracking real-time progress with percentage, like tasks, backups, migrations, syncs, or uploads
 - `alert`: best for status updates, such as feature adoption, reactivation, onboarding blockers, incidents, escalations, and other operational states
+- `timer`: best for countdowns and elapsed runtime, like benchmark runs, uploads, backups, transcodes, and long-running jobs
 
 ### Start & Update Live Activity
 
@@ -292,6 +293,31 @@ activitysmith activity stream customer-ops \
     }
   }'
 ```
+
+#### Timer
+
+<p align="center">
+  <img
+    src="https://cdn.activitysmith.com/features/timer-live-activity.png"
+    alt="Timer Live Activity showing a benchmark run countdown"
+    width="680"
+  />
+</p>
+
+```bash
+activitysmith activity stream benchmark-run \
+  --content-state '{
+    "title": "Benchmark Run",
+    "subtitle": "sampling",
+    "type": "timer",
+    "durationSeconds": 300,
+    "color": "cyan"
+  }'
+```
+
+For a countdown, send `duration_seconds`. You can update `title`, `subtitle`, `color`, or any other visible field as the work changes. Leave `duration_seconds` out unless you want to change the timer.
+
+To start at 00:00 and count up, set `counts_down: false` and leave out `duration_seconds`.
 
 ### End Live Activity
 
@@ -517,9 +543,13 @@ Or use flags to build the rest of the payload:
 - `--percentage <number>`
 - `--value <number>`
 - `--upper-limit <number>`
+- `--duration-seconds <number>`
+- `--counts-down <true|false>`
 - `--color <color>`
 - `--step-color <color>`
 - `--auto-dismiss-minutes <number>`
+
+For `timer`, use `--duration-seconds` for a countdown. To start at 00:00 and count up, use `--counts-down false` and leave out `--duration-seconds`.
 
 Live Activity action options:
 
@@ -537,10 +567,10 @@ Widget metric options:
 
 Required fields:
 
-- `activity stream`: `--title`, `--type`, plus `--metrics`, `--number-of-steps` and `--current-step`, `--percentage`, or `--value` with `--upper-limit`
-- `activity start`: `--title`, `--type`, plus `--metrics`, `--number-of-steps` and `--current-step`, `--percentage`, or `--value` with `--upper-limit`
-- `activity update`: `--title`, plus `--metrics`, `--current-step`, `--percentage`, or `--value` with `--upper-limit`
-- `activity end`: `--title`, plus `--metrics`, `--current-step`, `--percentage`, or `--value` with `--upper-limit`
+- `activity stream`: `--title`, `--type`, plus `--metrics`, `--number-of-steps` and `--current-step`, `--percentage`, `--value` with `--upper-limit`, or timer fields
+- `activity start`: `--title`, `--type`, plus `--metrics`, `--number-of-steps` and `--current-step`, `--percentage`, `--value` with `--upper-limit`, or timer fields
+- `activity update`: `--title`, plus `--metrics`, `--current-step`, `--percentage`, `--value` with `--upper-limit`, or timer fields
+- `activity end`: `--title`, plus `--metrics`, `--current-step`, `--percentage`, `--value` with `--upper-limit`, or timer fields
 - `activity end-stream`: no content state is required, but if you provide one it follows the same rules as `activity end`
 
 ## Output
