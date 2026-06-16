@@ -223,7 +223,11 @@ const addLiveActivityActionOptions = (command) =>
 const getApiKey = (options) =>
   options.apiKey || process.env.ACTIVITYSMITH_API_KEY;
 
-const createClient = (apiKey) => new ActivitySmith({ apiKey });
+const createClient = (apiKey) =>
+  new ActivitySmith({
+    apiKey,
+    sdk: { name: "cli", version },
+  });
 
 const assertPlainObject = (value, label) => {
   const isPlainObject =
