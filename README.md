@@ -339,7 +339,7 @@ activitysmith activity end-stream prod-web-1 \
 
 ### Live Activity Action
 
-Live Activities can include one optional action button.
+Live Activities can include an action button.
 
 - `open_url`: open an HTTPS URL.
 - `open_url` with a `shortcuts://` URL: run an Apple Shortcut, for example to open an app.
@@ -347,7 +347,7 @@ Live Activities can include one optional action button.
 
 <p align="center">
   <img
-    src="https://cdn.activitysmith.com/features/live-activity-with-action.png?v=20260319-1"
+    src="https://cdn.activitysmith.com/features/metrics-live-activity-action.png"
     alt="Live Activity with action button"
     width="680"
   />
@@ -411,6 +411,46 @@ activitysmith activity stream search-reindex \
       "job_id": "reindex-2026-03-19",
       "requested_by": "activitysmith-cli"
     }
+  }'
+```
+
+#### Secondary action
+
+<p align="center">
+  <img
+    src="https://cdn.activitysmith.com/features/live-activity-secondary-action.png"
+    alt="Alert Live Activity with primary and secondary action buttons"
+    width="680"
+  />
+</p>
+
+Use `--secondary-action` when you want a second button beside the primary `--action`.
+
+The secondary action button is supported for `alert`, `progress`, and `segmented_progress` Live Activities. Both buttons use the same `open_url`, `webhook`, and Apple Shortcut payload shapes.
+
+```bash
+activitysmith activity stream agent-approval \
+  --content-state '{
+    "title": "Approval Needed",
+    "message": "Should I send the follow-up email to Brightlane?",
+    "type": "alert",
+    "color": "green",
+    "icon": { "symbol": "sparkles", "color": "green" },
+    "badge": { "title": "Agent", "color": "green" }
+  }' \
+  --action '{
+    "title": "Send",
+    "type": "webhook",
+    "url": "https://hooks.example.com/agent/approval",
+    "method": "POST",
+    "body": { "decision": "send" }
+  }' \
+  --secondary-action '{
+    "title": "Deny",
+    "type": "webhook",
+    "url": "https://hooks.example.com/agent/approval",
+    "method": "POST",
+    "body": { "decision": "deny" }
   }'
 ```
 
@@ -555,6 +595,8 @@ Live Activity action options:
 
 - `--action <json>`
 - `--action-file <path>`
+- `--secondary-action <json>`
+- `--secondary-action-file <path>`
 
 Targeting options:
 
