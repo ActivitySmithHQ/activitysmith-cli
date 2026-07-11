@@ -1,6 +1,6 @@
 ---
 name: activitysmith
-description: Send ActivitySmith Push Notifications, include notification taps or actions that run a specific iPhone Shortcut, and manage Live Activities from coding agents through the ActivitySmith CLI.
+description: Send ActivitySmith Push Notifications, set App Icon Badge Counts, include notification taps or actions that run a specific iPhone Shortcut, and manage Live Activities from coding agents through the ActivitySmith CLI.
 ---
 
 # ActivitySmith
@@ -172,6 +172,20 @@ String values work too:
 
 ```bash
 activitysmith metrics update prod.status healthy
+```
+
+## App Icon Badge Count
+
+Use this when a number should stay visible on the ActivitySmith app icon.
+
+```bash
+activitysmith badge 8333
+```
+
+Pass `0` to clear the badge. Use `--channels` to target specific team members or devices.
+
+```bash
+activitysmith badge 3 --channels "sales,customer-success"
 ```
 
 ## Agent Behavior

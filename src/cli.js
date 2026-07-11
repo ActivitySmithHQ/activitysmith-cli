@@ -29,6 +29,16 @@ const parseIntegerOption = (label) => (value) => {
   return parsed;
 };
 
+const parseBadgeCountArgument = (value) => {
+  const badge = parseIntegerOption("badge")(value);
+  if (badge < 0 || badge > 2147483647) {
+    throw new InvalidArgumentError(
+      "badge must be an integer between 0 and 2147483647"
+    );
+  }
+  return badge;
+};
+
 const parseNumberOption = (label) => (value) => {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) {
@@ -1228,6 +1238,45 @@ program
         response?.success !== undefined
           ? `Success: ${response.success}`
           : null,
+        response?.devicesNotified !== undefined
+          ? `Devices notified: ${response.devicesNotified}`
+          : null,
+      ]);
+    } catch (error) {
+      await handleError(error, globalOptions);
+    }
+  });
+
+program
+  .command("badge")
+  .alias("badge-count")
+  .description("Set App Icon Badge Count; pass 0 to clear it")
+  .argument(
+    "<value>",
+    "App Icon Badge Count; pass 0 to clear it",
+    parseBadgeCountArgument
+  )
+  .option(
+    "--channels <channels>",
+    "Comma-separated channel slugs (optional)",
+    parseChannelsOption
+  )
+  .action(async (value, options) => {
+    const globalOptions = program.opts();
+
+    try {
+      const apiKey = requireApiKey(globalOptions);
+      const client = createClient(apiKey);
+      const response = await client.badgeCount(
+        value,
+        options.channels ? { channels: options.channels } : undefined
+      );
+
+      outputResult(response, globalOptions, [
+        value === 0
+          ? "App Icon Badge Count cleared."
+          : "App Icon Badge Count updated.",
+        response?.badge !== undefined ? `Badge: ${response.badge}` : null,
         response?.devicesNotified !== undefined
           ? `Devices notified: ${response.devicesNotified}`
           : null,

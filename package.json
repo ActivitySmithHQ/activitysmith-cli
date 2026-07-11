@@ -1,11 +1,12 @@
 {
   "name": "activitysmith-cli",
-  "version": "1.8.0",
-  "description": "Command-line interface for ActivitySmith. Send push notifications and manage Live Activities from your terminal.",
+  "version": "1.9.0",
+  "description": "Command-line interface for ActivitySmith. Send push notifications, manage Live Activities, and set App Icon Badge Counts from your terminal.",
   "keywords": [
     "activitysmith",
     "live-activities",
     "push-notifications",
+    "app-icon-badge",
     "api",
     "cli",
     "deployment",
@@ -40,7 +41,7 @@
     "lint": "node --check src/cli.js"
   },
   "dependencies": {
-    "activitysmith": "^1.8.0",
+    "activitysmith": "^1.9.0",
     "commander": "^12.1.0"
   }
 }
