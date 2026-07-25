@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
   cat <<'USAGE'
-Usage: send_push.sh -m "message" [-t "title"] [-s "subtitle"] [-c "channels"] [-M "media"] [-r "redirection"] [-a "actions-json"] [-A "actions-file"]
+Usage: send_push.sh -m "message" [-t "title"] [-s "subtitle"] [-c "channels"] [-g "tags"] [-M "media"] [-r "redirection"] [-a "actions-json"] [-A "actions-file"]
 
 Required:
   -m  Push message
@@ -12,6 +12,7 @@ Optional:
   -t  Push title (default: "ActivitySmith update")
   -s  Push subtitle
   -c  Comma-separated channel slugs (example: "devs,ops")
+  -g  Comma-separated tags (example: "user:382,billing")
   -M  Rich media HTTPS URL (image, audio, or video)
   -r  Redirection HTTPS or shortcuts:// URL (opened on notification tap)
   -a  Actions JSON array string (max 4 actions)
@@ -23,17 +24,19 @@ message=""
 title="ActivitySmith update"
 subtitle=""
 channels=""
+tags=""
 media=""
 redirection=""
 actions_json=""
 actions_file=""
 
-while getopts ":m:t:s:c:M:r:a:A:h" opt; do
+while getopts ":m:t:s:c:g:M:r:a:A:h" opt; do
   case "$opt" in
     m) message="$OPTARG" ;;
     t) title="$OPTARG" ;;
     s) subtitle="$OPTARG" ;;
     c) channels="$OPTARG" ;;
+    g) tags="$OPTARG" ;;
     M) media="$OPTARG" ;;
     r) redirection="$OPTARG" ;;
     a) actions_json="$OPTARG" ;;
@@ -74,6 +77,9 @@ if [[ -n "$subtitle" ]]; then
 fi
 if [[ -n "$channels" ]]; then
   cmd+=(--channels "$channels")
+fi
+if [[ -n "$tags" ]]; then
+  cmd+=(--tags "$tags")
 fi
 if [[ -n "$media" ]]; then
   cmd+=(--media "$media")
