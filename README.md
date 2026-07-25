@@ -20,6 +20,7 @@ CLI wrapper for the ActivitySmith API using the official Node SDK.
 - [Widgets](#widgets)
 - [App Icon Badge Count](#app-icon-badge-count)
 - [Channels](#channels)
+- [Tags](#tags)
 - [Aliases](#aliases)
 - [Content State Options](#content-state-options)
 - [Output](#output)
@@ -595,6 +596,17 @@ activitysmith activity start \
 activitysmith badge 3 --channels "sales,customer-success"
 ```
 
+## Tags
+
+Use `tags` to organize and filter your Push Notification and Live Activity history. Tags are created automatically when you first use them.
+
+```bash
+activitysmith push \
+  --title "New subscription 💸" \
+  --message "Customer upgraded to Pro plan" \
+  --tags "user:382,billing"
+```
+
 ## Aliases
 
 The CLI installs two bin names:
@@ -642,6 +654,10 @@ Live Activity action options:
 Targeting options:
 
 - `--channels <comma-separated-slugs>` (for `push`, `badge`, `activity stream`, and `activity start`)
+
+Organization options:
+
+- `--tags <comma-separated-tags>` (for `push`, `activity stream`, and `activity start`; repeat the option to add more tags)
 
 Widget metric options:
 

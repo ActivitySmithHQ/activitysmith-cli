@@ -80,6 +80,23 @@ const parseChannelsOption = (value) => {
   return channels;
 };
 
+const parseTagsOption = (value, previous = []) => {
+  if (typeof value !== "string") {
+    throw new InvalidArgumentError("tags must be a comma-separated string");
+  }
+
+  const tags = value
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter((tag) => tag.length > 0);
+
+  if (tags.length === 0) {
+    throw new InvalidArgumentError("tags must contain at least one tag");
+  }
+
+  return [...previous, ...tags];
+};
+
 const parseMetricValueArgument = (value) => {
   if (typeof value !== "string") {
     throw new InvalidArgumentError("value must be a string or number");
@@ -909,6 +926,17 @@ const withTargetChannels = (request, channels) => {
   };
 };
 
+const withTags = (request, tags) => {
+  if (!tags || tags.length === 0) {
+    return request;
+  }
+
+  return {
+    ...request,
+    tags,
+  };
+};
+
 const toApiLiveActivityUpdateRequest = (
   activityId,
   contentState,
@@ -1199,6 +1227,11 @@ program
     "Comma-separated channel slugs (optional)",
     parseChannelsOption
   )
+  .option(
+    "--tags <tags>",
+    "Comma-separated tags for organizing history (repeatable)",
+    parseTagsOption
+  )
   .action(async (options) => {
     const globalOptions = program.opts();
 
@@ -1225,6 +1258,7 @@ program
               ? normalizeOpenUrl(options.redirection, "redirection")
               : undefined,
           actions,
+          tags: options.tags,
         },
         options.channels
       );
@@ -1325,6 +1359,11 @@ addLiveActivityActionOptions(addContentStateOptions(
       "Comma-separated channel slugs (optional)",
       parseChannelsOption
     )
+    .option(
+      "--tags <tags>",
+      "Comma-separated tags for organizing history (repeatable)",
+      parseTagsOption
+    )
     .action(async (streamKey, options) => {
       const globalOptions = program.opts();
 
@@ -1337,13 +1376,16 @@ addLiveActivityActionOptions(addContentStateOptions(
 
         const response = await client.liveActivities.stream(
           streamKey,
-          withTargetChannels(
-            toApiLiveActivityStreamRequest(
-              contentState,
-              action,
-              secondaryAction
+          withTags(
+            withTargetChannels(
+              toApiLiveActivityStreamRequest(
+                contentState,
+                action,
+                secondaryAction
+              ),
+              options.channels
             ),
-            options.channels
+            options.tags
           )
         );
 
@@ -1370,6 +1412,11 @@ addLiveActivityActionOptions(addContentStateOptions(
       "Comma-separated channel slugs (optional)",
       parseChannelsOption
     )
+    .option(
+      "--tags <tags>",
+      "Comma-separated tags for organizing history (repeatable)",
+      parseTagsOption
+    )
     .action(async (options) => {
       const globalOptions = program.opts();
 
@@ -1381,13 +1428,16 @@ addLiveActivityActionOptions(addContentStateOptions(
         const secondaryAction = await loadLiveActivitySecondaryAction(options);
 
         const response = await client.liveActivities.startLiveActivity({
-          liveActivityStartRequest: withTargetChannels(
-            toApiLiveActivityStartRequest(
-              contentState,
-              action,
-              secondaryAction
+          liveActivityStartRequest: withTags(
+            withTargetChannels(
+              toApiLiveActivityStartRequest(
+                contentState,
+                action,
+                secondaryAction
+              ),
+              options.channels
             ),
-            options.channels
+            options.tags
           ),
         });
 

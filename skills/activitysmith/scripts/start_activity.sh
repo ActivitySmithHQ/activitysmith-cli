@@ -4,8 +4,8 @@ set -euo pipefail
 usage() {
   cat <<'USAGE'
 Usage:
-  start_activity.sh -t "title" --type "segmented_progress" --steps <n> --current <n> [-s "subtitle"] [-c "channels"] [--color "color"] [--step-color "color"] [--action '<json>' | --action-file /path/action.json] [--id-only]
-  start_activity.sh -t "title" --type "progress" [--percentage <n> | --value <n> --upper-limit <n>] [-s "subtitle"] [-c "channels"] [--color "color"] [--action '<json>' | --action-file /path/action.json] [--id-only]
+  start_activity.sh -t "title" --type "segmented_progress" --steps <n> --current <n> [-s "subtitle"] [-c "channels"] [--tags "tags"] [--color "color"] [--step-color "color"] [--action '<json>' | --action-file /path/action.json] [--id-only]
+  start_activity.sh -t "title" --type "progress" [--percentage <n> | --value <n> --upper-limit <n>] [-s "subtitle"] [-c "channels"] [--tags "tags"] [--color "color"] [--action '<json>' | --action-file /path/action.json] [--id-only]
 
 Required:
   -t, --title       Live Activity title
@@ -19,6 +19,7 @@ Optional:
   --upper-limit     Maximum value (progress; use with --value)
   -s, --subtitle    Subtitle
   -c, --channels    Comma-separated channel slugs
+  --tags            Comma-separated tags
   --color           Accent color
   --step-color      Step color (segmented_progress)
   --action          Live Activity action JSON object
@@ -30,6 +31,7 @@ USAGE
 title=""
 subtitle=""
 channels=""
+tags=""
 type=""
 steps=""
 current=""
@@ -47,6 +49,7 @@ while [[ $# -gt 0 ]]; do
     -t|--title) title="$2"; shift 2 ;;
     -s|--subtitle) subtitle="$2"; shift 2 ;;
     -c|--channels) channels="$2"; shift 2 ;;
+    --tags) tags="$2"; shift 2 ;;
     --type) type="$2"; shift 2 ;;
     --steps) steps="$2"; shift 2 ;;
     --current) current="$2"; shift 2 ;;
@@ -140,6 +143,9 @@ if [[ -n "$subtitle" ]]; then
 fi
 if [[ -n "$channels" ]]; then
   cmd+=(--channels "$channels")
+fi
+if [[ -n "$tags" ]]; then
+  cmd+=(--tags "$tags")
 fi
 if [[ -n "$color" ]]; then
   cmd+=(--color "$color")

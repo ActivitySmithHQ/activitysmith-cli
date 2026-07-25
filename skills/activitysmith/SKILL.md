@@ -39,6 +39,7 @@ export ACTIVITYSMITH_API_KEY="..."
 - Live Activity: progress should stay visible while work is ongoing.
 - Widget metric: one stable value should stay visible after the task ends.
 - Channels: only specific teammates/devices should receive the update.
+- Tags: related Push Notifications and Live Activities should be grouped in history.
 
 Default to a Push Notification for "notify me when done." Use a Live Activity only when the user asks for progress or the task is long-running enough that progress updates matter.
 
@@ -174,6 +175,17 @@ String values work too:
 activitysmith metrics update prod.status healthy
 ```
 
+## Tags
+
+Use tags to organize and filter Push Notification and Live Activity history. Tags are created automatically when they are first used.
+
+```bash
+./skills/activitysmith/scripts/send_push.sh \
+  -t "Task finished" \
+  -m "The customer import completed." \
+  -g "user:382,customer-import"
+```
+
 ## App Icon Badge Count
 
 Use this when a number should stay visible on the ActivitySmith app icon.
@@ -196,6 +208,7 @@ activitysmith badge 3 --channels "sales,customer-success"
 - For Shortcut taps, use `--redirection`.
 - For Shortcut buttons, use an `open_url` action with a `shortcuts://` URL.
 - For long-running progress, start one Live Activity, update it, then end it.
+- Add tags when the user wants related Push Notifications and Live Activities grouped in history.
 - Capture the Activity ID when using start/update/end.
 - Do not expose API keys, tokens, or secrets in titles, messages, action URLs, or webhook bodies.
 - If a command fails, report the error and do not retry repeatedly without a change.
