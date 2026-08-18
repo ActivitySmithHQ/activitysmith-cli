@@ -1311,8 +1311,8 @@ program
           ? "App Icon Badge Count cleared."
           : "App Icon Badge Count updated.",
         response?.badge !== undefined ? `Badge: ${response.badge}` : null,
-        response?.devicesNotified !== undefined
-          ? `Devices notified: ${response.devicesNotified}`
+        response?.devicesUpdated !== undefined || response?.devicesNotified !== undefined
+          ? `Devices updated: ${response.devicesUpdated ?? response.devicesNotified}`
           : null,
       ]);
     } catch (error) {
