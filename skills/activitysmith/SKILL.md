@@ -1,6 +1,6 @@
 ---
 name: activitysmith
-description: Send ActivitySmith Push Notifications, set App Icon Badge Counts, include notification taps or actions that run a specific iPhone Shortcut, and manage Live Activities from coding agents through the ActivitySmith CLI.
+description: Send ActivitySmith Push Notifications, start, update, and end Live Activities, set App Icon Badge Counts, and include notification taps or actions that run a specific iPhone Shortcut from coding agents through the ActivitySmith CLI.
 ---
 
 # ActivitySmith
@@ -11,7 +11,7 @@ Use this skill when the user wants an iPhone/iPad signal from an agent:
 - "send me a push notification"
 - "open this Shortcut when I tap the notification"
 - "open ChatGPT when I tap the notification"
-- "keep progress visible while you work"
+- "keep a metric, status, or progress visible while you work"
 - "show this metric on my Lock Screen"
 - "tell me if you get blocked"
 
@@ -36,12 +36,12 @@ export ACTIVITYSMITH_API_KEY="..."
 - Push Notification: one important event, completion, blocker, review request, or handoff.
 - Push Notification with redirection: tapping the notification should open a URL or run a specific Shortcut that already exists on the user's iPhone.
 - Push Notification with actions: long-press should show up to 4 buttons.
-- Live Activity: progress should stay visible while work is ongoing.
+- Live Activity: a real-time metric, operational state, or ongoing task should stay visible.
 - Widget metric: one stable value should stay visible after the task ends.
 - Channels: only specific teammates/devices should receive the update.
 - Tags: related Push Notifications and Live Activities should be grouped in history.
 
-Default to a Push Notification for "notify me when done." Use a Live Activity only when the user asks for progress or the task is long-running enough that progress updates matter.
+Default to a Push Notification for "notify me when done." Use a Live Activity when the user wants a real-time metric or state to remain visible, or when a long-running task needs progress updates.
 
 ## URL And Action Rules
 

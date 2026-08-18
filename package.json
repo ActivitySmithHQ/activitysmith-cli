@@ -1,7 +1,7 @@
 {
   "name": "activitysmith-cli",
   "version": "1.10.0",
-  "description": "Command-line interface for ActivitySmith. Send push notifications, manage Live Activities, and set App Icon Badge Counts from your terminal.",
+  "description": "Command-line interface for ActivitySmith. Send Push Notifications, start, update, and end Live Activities, and set App Icon Badge Counts from your terminal.",
   "keywords": [
     "activitysmith",
     "live-activities",

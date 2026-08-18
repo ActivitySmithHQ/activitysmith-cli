@@ -1347,7 +1347,7 @@ metricsCommand
 
 const activityCommand = program
   .command("activity")
-  .description("Manage Live Activities");
+  .description("Start, update, and end Live Activities");
 
 addLiveActivityActionOptions(addContentStateOptions(
   activityCommand
