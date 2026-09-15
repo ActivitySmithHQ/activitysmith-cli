@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { Command, InvalidArgumentError } from "commander";
+import { loadMetadata } from "./metadata.js";
 import ActivitySmith from "activitysmith";
 import { createRequire } from "module";
 import { readFile } from "fs/promises";
@@ -160,18 +161,30 @@ const normalizeUrlWithSchemes = (value, label, schemes) => {
   return parsed.toString();
 };
 
-const normalizeActionUrl = (value, label, type) => {
+const normalizeActionUrl = (value, label, type, push = false) => {
   if (type === "open_url") {
-    return normalizeUrlWithSchemes(value, label, ["https", "shortcuts"]);
+    if (push) return normalizeOpenUrl(value, label);
+    const normalized = typeof value === "string" ? value.trim().replace(/^x-safari-https:\/\//i, "https://") : value;
+    return normalizeUrlWithSchemes(normalized, label, ["http", "https", "shortcuts"]);
   }
 
   return normalizeHttpsUrl(value, label);
 };
 
-const normalizeOpenUrl = (value, label) =>
-  normalizeUrlWithSchemes(value, label, ["https", "shortcuts"]);
+const normalizeOpenUrl = (value, label) => {
+  if (typeof value !== "string") throw new Error(`${label} must be a string URL`);
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 2048 || /[\u0000-\u001f\u007f]/.test(trimmed)) {
+    throw new Error(`${label} must be a valid external URL of at most 2048 characters`);
+  }
+  let parsed;
+  try { parsed = new URL(trimmed); } catch { throw new Error(`${label} must be a valid external URL`); }
+  const blocked = ["about:", "activitysmith:", "app-prefs:", "blob:", "data:", "file:", "itms-services:", "javascript:", "prefs:"];
+  if (blocked.includes(parsed.protocol.toLowerCase())) throw new Error(`${label} uses a blocked URL scheme`);
+  return ["http:", "https:"].includes(parsed.protocol) ? parsed.toString() : trimmed;
+};
 
-const addContentStateOptions = (command, { includeAutoDismiss } = {}) => {
+const addContentStateOptions = (command, { includeAutoDismiss, includeAutoDismissSeconds } = {}) => {
   command
     .option("--content-state <json>", "Content state as JSON string")
     .option("--content-state-file <path>", "Content state JSON file path")
@@ -228,6 +241,14 @@ const addContentStateOptions = (command, { includeAutoDismiss } = {}) => {
       "--auto-dismiss-minutes <number>",
       "Auto dismiss minutes for ended activity",
       parseIntegerOption("auto-dismiss-minutes")
+    );
+  }
+
+  if (includeAutoDismissSeconds) {
+    command.option(
+      "--auto-dismiss-seconds <number>",
+      "Auto dismiss seconds for ended stream (takes precedence over minutes)",
+      parseIntegerOption("auto-dismiss-seconds")
     );
   }
 
@@ -388,6 +409,13 @@ const validateContentState = (contentState, mode) => {
   const hasCountsDown = hasOwn(contentState, "countsDown");
   const hasTimerFields = hasDurationSeconds || hasCountsDown;
 
+  for (const key of ["autoDismissSeconds", "auto_dismiss_seconds"]) {
+    if (hasOwn(contentState, key) &&
+        (!Number.isInteger(contentState[key]) || contentState[key] < 0)) {
+      throw new Error(`contentState.${key} must be a non-negative integer`);
+    }
+  }
+
   if (hasValue !== hasUpperLimit) {
     throw new Error(
       "contentState.value and contentState.upperLimit must be provided together"
@@ -472,7 +500,7 @@ const validateContentState = (contentState, mode) => {
   }
 
   if (
-    hasAlertFields &&
+    hasMessage &&
     (hasMetrics || hasSegmentedFields || hasProgressFields || hasStepColor)
   ) {
     throw new Error(
@@ -552,7 +580,7 @@ const validateContentState = (contentState, mode) => {
     }
 
     if (effectiveType === "timer") {
-      if (!hasDurationSeconds && contentState.countsDown !== false) {
+      if (mode === "start" && !hasDurationSeconds && contentState.countsDown !== false) {
         throw new Error(
           `timer ${mode} requires contentState.durationSeconds, or contentState.countsDown=false`
         );
@@ -637,7 +665,7 @@ const validateContentState = (contentState, mode) => {
   }
 };
 
-const parseAction = (value, label) => {
+const parseAction = (value, label, push = false) => {
   assertPlainObject(value, label);
 
   if (typeof value.title !== "string" || value.title.trim().length === 0) {
@@ -656,7 +684,7 @@ const parseAction = (value, label) => {
   const action = {
     title: value.title.trim(),
     type: normalizedType,
-    url: normalizeActionUrl(value.url, `${label}.url`, normalizedType),
+    url: normalizeActionUrl(value.url, `${label}.url`, normalizedType, push),
   };
 
   if (value.method !== undefined) {
@@ -682,7 +710,7 @@ const parseAction = (value, label) => {
   return action;
 };
 
-const parsePushAction = (value, index) => parseAction(value, `actions[${index}]`);
+const parsePushAction = (value, index) => parseAction(value, `actions[${index}]`, true);
 
 const loadPushActions = async (options) => {
   if (options.actions && options.actionsFile) {
@@ -845,6 +873,10 @@ const buildContentStateFromOptions = (options) => {
     contentState.stepColor = options.stepColor;
   }
 
+  if (options.autoDismissSeconds !== undefined) {
+    contentState.autoDismissSeconds = options.autoDismissSeconds;
+  }
+
   if (options.autoDismissMinutes !== undefined) {
     contentState.autoDismissMinutes = options.autoDismissMinutes;
   }
@@ -875,6 +907,7 @@ const toApiContentState = (contentState) => {
     upperLimit: "upper_limit",
     stepColor: "step_color",
     autoDismissMinutes: "auto_dismiss_minutes",
+    autoDismissSeconds: "auto_dismiss_seconds",
     durationSeconds: "duration_seconds",
     countsDown: "counts_down",
   };
@@ -926,8 +959,9 @@ const withTargetChannels = (request, channels) => {
   };
 };
 
-const withTags = (request, tags) => {
-  if (!tags || tags.length === 0) {
+const withTags = (request, tags, metadata) => {
+  if (metadata !== undefined) request = { ...request, metadata };
+  if (tags === undefined) {
     return request;
   }
 
@@ -1232,7 +1266,9 @@ program
     "Comma-separated tags for organizing history (repeatable)",
     parseTagsOption
   )
-  .action(async (options) => {
+  .option("--metadata <json>", "Metadata JSON object shown in ActivitySmith details")
+    .option("--metadata-file <path>", "Path to a Metadata JSON object file")
+    .action(async (options) => {
     const globalOptions = program.opts();
 
     try {
@@ -1259,6 +1295,7 @@ program
               : undefined,
           actions,
           tags: options.tags,
+          metadata: await loadMetadata(options),
         },
         options.channels
       );
@@ -1330,7 +1367,9 @@ metricsCommand
   .description("Update a widget metric value")
   .argument("<metric-key>", "Metric key")
   .argument("<value>", "Metric value")
-  .action(async (metricKey, rawValue) => {
+  .option("--metadata <json>", "Metadata JSON object shown in ActivitySmith details")
+    .option("--metadata-file <path>", "Path to a Metadata JSON object file")
+    .action(async (metricKey, rawValue) => {
     const globalOptions = program.opts();
 
     try {
@@ -1364,10 +1403,16 @@ addLiveActivityActionOptions(addContentStateOptions(
       "Comma-separated tags for organizing history (repeatable)",
       parseTagsOption
     )
+    .option("--clear-tags", "Remove all Tags from this stream")
+    .option("--metadata <json>", "Metadata JSON object shown in ActivitySmith details")
+    .option("--metadata-file <path>", "Path to a Metadata JSON object file")
     .action(async (streamKey, options) => {
       const globalOptions = program.opts();
 
       try {
+        if (options.clearTags && options.tags !== undefined) {
+          throw new Error("Use either --tags or --clear-tags, not both.");
+        }
         const apiKey = requireApiKey(globalOptions);
         const client = createClient(apiKey);
         const contentState = await loadContentState(options, "stream");
@@ -1385,7 +1430,8 @@ addLiveActivityActionOptions(addContentStateOptions(
               ),
               options.channels
             ),
-            options.tags
+            options.clearTags ? [] : options.tags,
+            await loadMetadata(options)
           )
         );
 
@@ -1417,6 +1463,8 @@ addLiveActivityActionOptions(addContentStateOptions(
       "Comma-separated tags for organizing history (repeatable)",
       parseTagsOption
     )
+    .option("--metadata <json>", "Metadata JSON object shown in ActivitySmith details")
+    .option("--metadata-file <path>", "Path to a Metadata JSON object file")
     .action(async (options) => {
       const globalOptions = program.opts();
 
@@ -1437,7 +1485,8 @@ addLiveActivityActionOptions(addContentStateOptions(
               ),
               options.channels
             ),
-            options.tags
+            options.tags,
+            await loadMetadata(options)
           ),
         });
 
@@ -1457,10 +1506,17 @@ addLiveActivityActionOptions(addContentStateOptions(
     .command("update")
     .description("Update a Live Activity")
     .requiredOption("--activity-id <id>", "Live Activity ID")
+    .option("--tags <tags>", "Replace Tags for this Live Activity (repeatable)", parseTagsOption)
+    .option("--clear-tags", "Remove all Tags from this Live Activity")
+    .option("--metadata <json>", "Metadata JSON object shown in ActivitySmith details")
+    .option("--metadata-file <path>", "Path to a Metadata JSON object file")
     .action(async (options) => {
       const globalOptions = program.opts();
 
       try {
+        if (options.clearTags && options.tags !== undefined) {
+          throw new Error("Use either --tags or --clear-tags, not both.");
+        }
         const apiKey = requireApiKey(globalOptions);
         const client = createClient(apiKey);
         const contentState = await loadContentState(options, "update");
@@ -1468,12 +1524,12 @@ addLiveActivityActionOptions(addContentStateOptions(
         const secondaryAction = await loadLiveActivitySecondaryAction(options);
 
         const response = await client.liveActivities.updateLiveActivity({
-          liveActivityUpdateRequest: toApiLiveActivityUpdateRequest(
+          liveActivityUpdateRequest: withTags(toApiLiveActivityUpdateRequest(
             options.activityId,
             contentState,
             action,
             secondaryAction
-          ),
+          ), options.clearTags ? [] : options.tags, await loadMetadata(options)),
         });
 
         outputResult(response, globalOptions, [
@@ -1491,10 +1547,17 @@ addLiveActivityActionOptions(addContentStateOptions(
     .command("end")
     .description("End a Live Activity")
     .requiredOption("--activity-id <id>", "Live Activity ID")
+    .option("--tags <tags>", "Replace Tags for this Live Activity (repeatable)", parseTagsOption)
+    .option("--clear-tags", "Remove all Tags from this Live Activity")
+    .option("--metadata <json>", "Metadata JSON object shown in ActivitySmith details")
+    .option("--metadata-file <path>", "Path to a Metadata JSON object file")
     .action(async (options) => {
       const globalOptions = program.opts();
 
       try {
+        if (options.clearTags && options.tags !== undefined) {
+          throw new Error("Use either --tags or --clear-tags, not both.");
+        }
         const apiKey = requireApiKey(globalOptions);
         const client = createClient(apiKey);
         const contentState = await loadContentState(options, "end");
@@ -1502,12 +1565,12 @@ addLiveActivityActionOptions(addContentStateOptions(
         const secondaryAction = await loadLiveActivitySecondaryAction(options);
 
         const response = await client.liveActivities.endLiveActivity({
-          liveActivityEndRequest: toApiLiveActivityEndRequest(
+          liveActivityEndRequest: withTags(toApiLiveActivityEndRequest(
             options.activityId,
             contentState,
             action,
             secondaryAction
-          ),
+          ), options.clearTags ? [] : options.tags, await loadMetadata(options)),
         });
 
         outputResult(response, globalOptions, [
@@ -1526,10 +1589,17 @@ addLiveActivityActionOptions(addContentStateOptions(
     .command("end-stream")
     .description("End a stateless Live Activity stream")
     .argument("<stream-key>", "Stable stream key")
+    .option("--tags <tags>", "Comma-separated Tags", parseTagsOption)
+    .option("--clear-tags", "Clear existing Tags")
+    .option("--metadata <json>", "Metadata as a JSON object")
+    .option("--metadata-file <path>", "Metadata JSON file path")
     .action(async (streamKey, options) => {
       const globalOptions = program.opts();
 
       try {
+        if (options.clearTags && options.tags !== undefined) throw new Error("Provide either --tags or --clear-tags, not both.");
+        const tags = options.clearTags ? [] : options.tags;
+        const metadata = await loadMetadata(options);
         const apiKey = requireApiKey(globalOptions);
         const client = createClient(apiKey);
         const contentState = await loadOptionalContentState(options, "end");
@@ -1539,7 +1609,7 @@ addLiveActivityActionOptions(addContentStateOptions(
         const request =
           contentState !== undefined ||
           action !== undefined ||
-          secondaryAction !== undefined
+          secondaryAction !== undefined || tags !== undefined || metadata !== undefined
             ? toApiLiveActivityStreamDeleteRequest(
                 contentState,
                 action,
@@ -1547,6 +1617,8 @@ addLiveActivityActionOptions(addContentStateOptions(
               )
             : undefined;
 
+        if (tags !== undefined) request.tags = tags;
+        if (metadata !== undefined) request.metadata = metadata;
         const response = await client.liveActivities.endStream(streamKey, request);
 
         const activityId = response?.activityId ?? response?.activity_id;
@@ -1561,7 +1633,7 @@ addLiveActivityActionOptions(addContentStateOptions(
         await handleError(error, globalOptions);
       }
     }),
-  { includeAutoDismiss: true }
+  { includeAutoDismiss: true, includeAutoDismissSeconds: true }
 ));
 
 program.showHelpAfterError(true);

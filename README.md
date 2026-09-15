@@ -1,31 +1,10 @@
 # ActivitySmith CLI
 
-CLI wrapper for the ActivitySmith API using the official Node SDK.
+[Documentation](https://activitysmith.com/docs/sdks/cli)
 
-## Table of Contents
+## Installation
 
-- [Install](#install)
-- [Agent Skill](#agent-skill)
-- [Auth](#auth)
-- [Push Notifications](#push-notifications)
-  - [Send Push Notification](#send-push-notification)
-  - [Rich Push Notifications with Media](#rich-push-notifications-with-media)
-  - [Actionable Push Notifications](#actionable-push-notifications)
-- [Live Activities](#live-activities)
-  - [Start & Update Live Activity](#start--update-live-activity)
-  - [End Live Activity](#end-live-activity)
-  - [Live Activity Action](#live-activity-action)
-  - [Icons and Badges](#icons-and-badges)
-  - [Live Activity Colors](#live-activity-colors)
-- [Widgets](#widgets)
-- [App Icon Badge Count](#app-icon-badge-count)
-- [Channels](#channels)
-- [Tags](#tags)
-- [Aliases](#aliases)
-- [Content State Options](#content-state-options)
-- [Output](#output)
-
-## Install
+Install the ActivitySmith CLI globally with npm:
 
 ```bash
 npm install -g activitysmith-cli
@@ -33,79 +12,65 @@ npm install -g activitysmith-cli
 
 ## Agent Skill
 
-<p align="center">
-  <img src="https://cdn.activitysmith.com/features/apple-shortcut-actions.png" alt="ActivitySmith Push Notification Actions with an Apple Shortcut action" width="680" />
-</p>
-
-The ActivitySmith skill helps coding agents decide when and how to notify you.
-
-Use it for prompts like:
-
-- "Notify me when you're done."
-- "Send me a push notification if you get blocked."
-- "When the task finishes, the notification tap should run my Test Shortcut."
-- "Show progress on my Lock Screen while you work."
-
-The skill maps those requests to the CLI:
-
-- Push Notifications for completion, blockers, and review requests
-- `shortcuts://` redirection for a specific iPhone Shortcut
-- action buttons for follow-up links or Shortcut buttons
-- Live Activities for long-running progress
-- widget metrics for values that should stay visible
-- App Icon Badge Counts for a number that should stay on the app icon
-
-Install the public skill from this repo:
+Install the ActivitySmith skill when you want Codex, Claude, Cursor, or another skills-compatible agent to decide which ActivitySmith CLI command to run.
 
 ```bash
 npx -y skills@latest add ActivitySmithHQ/activitysmith-cli --skill activitysmith
 ```
 
-Skill path in this repo:
+Use the skill when an agent should notify you with Push Notifications, include a notification tap or action that can open a URL or run a specific iPhone Shortcut, or keep task progress visible with Live Activities.
 
-```text
-skills/activitysmith
+For example, a Codex agent can work on your computer, send a Push Notification when it needs your attention, and include a Shortcut action that runs an `OpenChatGPT` Shortcut on your iPhone so you can continue the conversation in the ChatGPT app.
+
+## Quickstart
+
+1. [Create an API key](https://activitysmith.com/app/keys)
+2. Authenticate with `ACTIVITYSMITH_API_KEY` or pass `--api-key` per command.
+3. Run `activitysmith --help` to inspect available commands.
+
+Use the environment variable when you want the cleanest shell scripts:
+
+```bash
+export ACTIVITYSMITH_API_KEY="YOUR-API-KEY"
+
+activitysmith --help
 ```
 
-The skill is agent-neutral and recipe-driven. It uses `ACTIVITYSMITH_API_KEY` auth plus the same CLI commands shown below.
+Or pass the key directly:
 
-## Auth
-
-Set `ACTIVITYSMITH_API_KEY` or pass `--api-key`.
-
-For the skill scripts, you can also copy `skills/activitysmith/.env.example` to `skills/activitysmith/.env`.
+```bash
+activitysmith --api-key "YOUR-API-KEY" push --title "Hello"
+```
 
 ## Push Notifications
 
-Run `activitysmith --help` to inspect available commands.
+### Send a Push Notification
 
-### Send Push Notification
+Send an immediate notification for a completed task or event.
+
+![Push Notification example](https://cdn.activitysmith.com/printkit/notification.png)
 
 ```bash
 activitysmith push \
   --title "Build Failed 🚨" \
-  --message "CI pipeline failed on main branch"
+  --message "CI pipeline failed on main branch" \
+  --subtitle "main"
 ```
 
 ### Rich Push Notifications with Media
 
-<p align="center">
-  <img src="https://cdn.activitysmith.com/features/rich-push-notification-with-image.png" alt="Rich push notification with image" width="680" />
-</p>
+![Rich Push Notification with image](https://cdn.activitysmith.com/features/rich-push-notification-with-image.png)
 
 ```bash
 activitysmith push \
   --title "Homepage ready" \
   --message "Your agent finished the redesign." \
-  --media "https://cdn.example.com/output/homepage-v2.png" \
-  --redirection "https://github.com/acme/web/pull/482"
+  --media "https://cdn.example.com/output/homepage-v2.png"
 ```
 
-Send images, videos, or audio with your push notifications, press and hold to preview media directly from the notification, then tap through to open the linked content.
+Attach images, videos, or audio to your Push Notifications. Press and hold the notification to preview the media.
 
-<p align="center">
-  <img src="https://cdn.activitysmith.com/features/rich-push-notification-with-audio.png" alt="Rich push notification with audio" width="680" />
-</p>
+![Rich Push Notification with audio](https://cdn.activitysmith.com/features/rich-push-notification-with-audio.png)
 
 What will work:
 
@@ -114,25 +79,32 @@ What will work:
 - direct video file URL: `.mp4`, `.mov`, etc.
 - URL that responds with a proper media `Content-Type`, even if the path has no extension
 
-`--media` can be combined with `--redirection`, but not with `--actions` or `--actions-file`.
+`--media` cannot be combined with `--actions`.
+
+### Push Notifications with Redirection
+
+Open a web page, an iPhone Shortcut, or an installed app when someone taps the notification. Set `--redirection` to an HTTP, HTTPS, or Shortcuts URL, or an app deep link such as `spotify:track:123`.
+
+```bash
+activitysmith push \
+  --title "Homepage ready" \
+  --message "Your agent finished the redesign." \
+  --redirection "https://github.com/acme/web/pull/482"
+```
 
 ### Actionable Push Notifications
 
-<p align="center">
-  <img src="https://cdn.activitysmith.com/features/actionable-push-notifications-2.png" alt="Actionable push notification example" width="680" />
-</p>
+![Actionable Push Notification with redirection and actions](https://cdn.activitysmith.com/features/actionable-push-notifications-2.png)
 
-Push notification `--redirection` and `--actions` are optional. Use them to open HTTPS URLs, run a specific iPhone Shortcut with a `shortcuts://run-shortcut?name=...` URL, or trigger backend webhook workflows.
-Webhooks are executed by the ActivitySmith backend.
+For expanded notification actions, `open_url` supports HTTP, HTTPS, Shortcuts, and installed app deep links. Webhooks are executed by the ActivitySmith backend and must use HTTPS. Custom app links require iOS 1.13.4 build 2 or later and an installed app that handles the URL.
 
 ```bash
 activitysmith push \
   --title "Build Failed 🚨" \
   --message "CI pipeline failed on main branch" \
-  --redirection "https://github.com/org/repo/actions/runs/123456789" \
   --actions '[
     {
-      "title": "Open Failing Run",
+      "title": "Open Build",
       "type": "open_url",
       "url": "https://github.com/org/repo/actions/runs/123456789"
     },
@@ -155,7 +127,7 @@ activitysmith push \
   ]'
 ```
 
-You can also load actions from a file:
+You can also save the JSON array above as `actions.json` and load it from a file:
 
 ```bash
 activitysmith push \
@@ -166,14 +138,19 @@ activitysmith push \
 
 ## Live Activities
 
-There are six types of Live Activities:
+Choose the Live Activity type that matches what you want to show:
 
-- `stats`: best for showing business numbers side by side, such as revenue, sales, new users, conversion, refunds, or any other value you want visible at a glance
-- `metrics`: best for live percentage values that change often, like server CPU, memory usage, disk usage, or error rate
-- `segmented_progress`: best for anything that moves through clear stages, like deployments, onboarding flows, backups, ETL pipelines, migrations, and AI agent runs
-- `progress`: best for tracking real-time progress with percentage, like tasks, backups, migrations, syncs, or uploads
-- `alert`: best for status updates, such as feature adoption, reactivation, onboarding blockers, incidents, escalations, and other operational states
-- `timer`: best for countdowns and elapsed runtime, like benchmark runs, uploads, backups, transcodes, and long-running jobs
+- ![Stats Live Activity with six labeled sales metrics](https://cdn.activitysmith.com/features/stats-live-activity.png) **Stats**: Show up to 8 labeled values on your Lock Screen, from revenue and orders to uptime and conversion.
+
+- ![Metrics Live Activity with CPU and memory values](https://cdn.activitysmith.com/features/metrics-live-activity-start.png) **Metrics**: Track two related values with segmented bars, such as CPU and memory.
+
+- ![Segmented Progress Live Activity showing a workflow step](https://cdn.activitysmith.com/features/update-live-activity.png) **Segmented Progress**: Show progress through a known set of steps, like build, test, deploy, and verify.
+
+- ![Progress Live Activity showing percentage completion](https://cdn.activitysmith.com/features/progress-live-activity.png) **Progress**: Show percentage progress for jobs that move continuously toward completion.
+
+- ![Alert Live Activity showing a customer reactivation update](https://cdn.activitysmith.com/features/alert-live-activity.png) **Alert**: Show status updates with a clear message, badge, and icon. When you add an action button, `color` controls the button tint.
+
+- ![Timer Live Activity showing a benchmark run countdown](https://cdn.activitysmith.com/features/timer-live-activity.png) **Timer**: Count down from a duration, or count up from 00:00 while a job runs.
 
 ### Start & Update Live Activity
 
@@ -181,13 +158,7 @@ Use a stable `stream_key` to identify the metric, job, deployment, or system you
 
 #### Stats
 
-<p align="center">
-  <img
-    src="https://cdn.activitysmith.com/features/stats-live-activity.png"
-    alt="Stats Live Activity stream example"
-    width="680"
-  />
-</p>
+![Stats Live Activity stream example](https://cdn.activitysmith.com/features/stats-live-activity.png)
 
 ```bash
 activitysmith activity stream sales-hourly \
@@ -208,13 +179,7 @@ activitysmith activity stream sales-hourly \
 
 #### Metrics
 
-<p align="center">
-  <img
-    src="https://cdn.activitysmith.com/features/metrics-live-activity-start.png"
-    alt="Metrics Live Activity stream example"
-    width="680"
-  />
-</p>
+![Metrics Live Activity stream example](https://cdn.activitysmith.com/features/metrics-live-activity-start.png)
 
 ```bash
 activitysmith activity stream prod-web-1 \
@@ -231,13 +196,7 @@ activitysmith activity stream prod-web-1 \
 
 #### Segmented Progress
 
-<p align="center">
-  <img
-    src="https://cdn.activitysmith.com/features/update-live-activity.png"
-    alt="Segmented Progress Live Activity stream example"
-    width="680"
-  />
-</p>
+![Segmented Progress Live Activity stream example](https://cdn.activitysmith.com/features/update-live-activity.png)
 
 ```bash
 activitysmith activity stream nightly-backup \
@@ -252,13 +211,7 @@ activitysmith activity stream nightly-backup \
 
 #### Progress
 
-<p align="center">
-  <img
-    src="https://cdn.activitysmith.com/features/progress-live-activity.png"
-    alt="Progress Live Activity stream example"
-    width="680"
-  />
-</p>
+![Progress Live Activity stream example](https://cdn.activitysmith.com/features/progress-live-activity.png)
 
 ```bash
 activitysmith activity stream search-reindex \
@@ -272,13 +225,7 @@ activitysmith activity stream search-reindex \
 
 #### Alert
 
-<p align="center">
-  <img
-    src="https://cdn.activitysmith.com/features/alert-live-activity.png"
-    alt="Alert Live Activity stream example"
-    width="680"
-  />
-</p>
+![Alert Live Activity stream example](https://cdn.activitysmith.com/features/alert-live-activity.png)
 
 ```bash
 activitysmith activity stream customer-ops \
@@ -299,13 +246,7 @@ activitysmith activity stream customer-ops \
 
 #### Timer
 
-<p align="center">
-  <img
-    src="https://cdn.activitysmith.com/features/timer-live-activity.png"
-    alt="Timer Live Activity showing a benchmark run countdown"
-    width="680"
-  />
-</p>
+![Timer Live Activity stream example](https://cdn.activitysmith.com/features/timer-live-activity.png)
 
 ```bash
 activitysmith activity stream benchmark-run \
@@ -318,16 +259,17 @@ activitysmith activity stream benchmark-run \
   }'
 ```
 
-For a countdown, send `duration_seconds`. You can update `title`, `subtitle`, `color`, or any other visible field as the work changes. Leave `duration_seconds` out unless you want to change the timer.
+For a countdown, send `durationSeconds`. Leave it out on later stream updates to preserve the running timer. Supplying a new duration restarts the countdown.
 
-To start at 00:00 and count up, set `counts_down: false` and leave out `duration_seconds`.
+To start at 00:00 and count up, set `countsDown` to `false` and leave out `durationSeconds`.
 
 ### End Live Activity
 
-Call `activity end-stream` with the same `stream_key` to dismiss the Live Activity. You can include final values before it is removed. By default, iOS removes the Live Activity after two minutes. Set `autoDismissMinutes` to choose a different dismissal time, including `0` for immediate dismissal.
+Call `activity end-stream` with the same `stream_key` to dismiss the Live Activity. You can include final values before it is removed. Use `--auto-dismiss-seconds` or `--auto-dismiss-minutes` to delay dismissal. Use `0` for immediate dismissal. Seconds take precedence if both are set. JSON content state also accepts `autoDismissSeconds` or `auto_dismiss_seconds`.
 
 ```bash
 activitysmith activity end-stream prod-web-1 \
+  --auto-dismiss-seconds 30 \
   --content-state '{
     "title": "Server Health",
     "subtitle": "prod-web-1",
@@ -335,26 +277,57 @@ activitysmith activity end-stream prod-web-1 \
     "metrics": [
       { "label": "CPU", "value": 7, "unit": "%" },
       { "label": "MEM", "value": 38, "unit": "%" }
-    ],
-    "autoDismissMinutes": 2
+    ]
   }'
 ```
 
+### Icons and Badges
+
+Add more context to Live Activities with icons and badges.
+
+#### Icon
+
+```bash
+  --content-state '{
+    "title": "Server Health",
+    "type": "metrics",
+    "metrics": [
+      { "label": "CPU", "value": 18, "unit": "%" },
+      { "label": "MEM", "value": 42, "unit": "%" }
+    ],
+    "icon": { "symbol": "server.rack", "color": "blue" }
+  }'
+```
+
+The `icon.symbol` value is an Apple SF Symbol name. Browse the catalog in the ActivitySmith iOS app under Settings > SF Symbols.
+
+#### Badge
+
+```bash
+  --content-state '{
+    "title": "Nightly Database Backup",
+    "type": "segmented_progress",
+    "numberOfSteps": 3,
+    "currentStep": 2,
+    "badge": { "title": "S3", "color": "cyan" }
+  }'
+```
+
+### Live Activity Colors
+
+Choose from these colors for the Live Activity accent, including progress bars and action buttons, or apply them to an individual icon or badge:
+
+`lime`, `green`, `cyan`, `blue`, `purple`, `magenta`, `red`, `orange`, `yellow`, `gray`
+
 ### Live Activity Action
+
+![Metrics Live Activity with action](https://cdn.activitysmith.com/features/metrics-live-activity-action.png)
 
 Live Activities can include an action button.
 
-- `open_url`: open an HTTPS URL.
-- `open_url` with a `shortcuts://` URL: run an Apple Shortcut, for example to open an app.
+- `open_url`: open an HTTP or HTTPS URL.
+- `open_url` with a `shortcuts://run-shortcut?name=...` URL: run a specific iPhone Shortcut, for example to open an app.
 - `webhook`: trigger a backend GET/POST workflow.
-
-<p align="center">
-  <img
-    src="https://cdn.activitysmith.com/features/metrics-live-activity-action.png"
-    alt="Live Activity with action button"
-    width="680"
-  />
-</p>
 
 #### Open URL action
 
@@ -372,20 +345,22 @@ activitysmith activity stream prod-web-1 \
   --action '{
     "title": "Dashboard",
     "type": "open_url",
-    "url": "https://ops.example.com/servers/prod-web-1"
+    "url": "https://status.example.com/servers/prod-web-1"
   }'
 ```
 
 #### Apple Shortcut action
 
 ```bash
-activitysmith activity stream deploy-payments-api \
+activitysmith activity stream prod-web-1 \
   --content-state '{
-    "title": "Deploying payments-api",
-    "subtitle": "Running database migrations",
-    "type": "segmented_progress",
-    "numberOfSteps": 5,
-    "currentStep": 3
+    "title": "Server Health",
+    "subtitle": "prod-web-1",
+    "type": "metrics",
+    "metrics": [
+      { "label": "CPU", "value": 76, "unit": "%" },
+      { "label": "MEM", "value": 52, "unit": "%" }
+    ]
   }' \
   --action '{
     "title": "Chat with Jarvis",
@@ -419,13 +394,7 @@ activitysmith activity stream search-reindex \
 
 #### Secondary action
 
-<p align="center">
-  <img
-    src="https://cdn.activitysmith.com/features/live-activity-secondary-action.png"
-    alt="Alert Live Activity with primary and secondary action buttons"
-    width="680"
-  />
-</p>
+![Alert Live Activity with primary and secondary action buttons](https://cdn.activitysmith.com/features/live-activity-secondary-action.png)
 
 Use `--secondary-action` when you want a second button beside the primary `--action`.
 
@@ -444,156 +413,61 @@ activitysmith activity stream agent-approval \
   --action '{
     "title": "Send",
     "type": "webhook",
-    "url": "https://hooks.example.com/agent/approval",
+    "url": "https://agent.example.com/live-activity/approve",
     "method": "POST",
-    "body": { "decision": "send" }
+    "body": {
+      "approval_id": "approval_01JY3J7Q9S0P8M1V5PZK7DR4M2",
+      "decision": "send"
+    }
   }' \
   --secondary-action '{
     "title": "Deny",
     "type": "webhook",
-    "url": "https://hooks.example.com/agent/approval",
+    "url": "https://agent.example.com/live-activity/deny",
     "method": "POST",
-    "body": { "decision": "deny" }
+    "body": {
+      "approval_id": "approval_01JY3J7Q9S0P8M1V5PZK7DR4M2",
+      "decision": "deny"
+    }
   }'
 ```
 
-### Icons and Badges
+## Lock Screen Widgets
 
-Add more context to Live Activities with icons and badges.
+![Lock screen widgets](https://cdn.activitysmith.com/features/lock-screen-widgets.png)
 
-#### Icon
+ActivitySmith lets you display any value on your Lock Screen with widgets - SaaS metrics, revenue, signups, uptime, habits, or anything else you want to track. Create a metric in the [web app](https://activitysmith.com/app/widgets), then update the metric value using our API, add a widget to your lock screen and it will fetch the latest update automatically.
 
-Supported Live Activity types: `stats`, `metrics`, `progress`, `segmented_progress`, and `alert`.
-
-<p align="center">
-  <img
-    src="https://cdn.activitysmith.com/features/metrics-live-activity-with-icon.png"
-    alt="Metrics Live Activity with an SF Symbol icon on the iPhone Lock Screen"
-    width="680"
-  />
-</p>
-
-```bash
-activitysmith activity stream prod-web-1 \
-  --content-state '{
-    "title": "Server Health",
-    "subtitle": "prod-web-1",
-    "type": "metrics",
-    "icon": { "symbol": "server.rack", "color": "blue" },
-    "metrics": [
-      { "label": "CPU", "value": 18, "unit": "%" },
-      { "label": "MEM", "value": 42, "unit": "%" }
-    ]
-  }'
-```
-
-The `icon.symbol` value is an Apple SF Symbol name. Browse the catalog with one of these tools:
-
-- [ActivitySmith app](https://apps.apple.com/us/app/activitysmith/id6752254835) - Open Settings -> SF Symbols to browse 45 hand-picked icons ready to use
-- [SF Symbols](https://developer.apple.com/sf-symbols/) - Apple's official macOS app
-- [Interactful](https://apps.apple.com/app/interactful/id1528095640) - free third-party iOS app listing all SF Symbols under Foundations -> Iconography
-
-#### Badge
-
-Badges are supported by `alert`, `progress`, and `segmented_progress` Live Activities.
-
-<p align="center">
-  <img
-    src="https://cdn.activitysmith.com/features/progress-live-activity-with-badge.png"
-    alt="Progress Live Activity with a badge on the iPhone Lock Screen"
-    width="680"
-  />
-</p>
-
-```bash
-activitysmith activity stream nightly-database-backup \
-  --content-state '{
-    "title": "Nightly Database Backup",
-    "subtitle": "verify restore",
-    "type": "progress",
-    "badge": { "title": "S3", "color": "cyan" },
-    "percentage": 62
-  }'
-```
-
-### Live Activity Colors
-
-Choose from these colors for the Live Activity accent, including progress bars and action buttons, or apply them to an individual icon or badge:
-
-`lime`, `green`, `cyan`, `blue`, `purple`, `magenta`, `red`, `orange`, `yellow`, `gray`
-
-## Widgets
-
-<p align="center">
-  <img src="https://cdn.activitysmith.com/features/lock-screen-widgets.png" alt="Lock screen widgets" width="680" />
-</p>
-
-ActivitySmith lets you display any value on your Lock Screen with widgets - SaaS metrics, revenue, signups, uptime, habits, or anything else you want to track. Create a metric in the <a href="https://activitysmith.com/app/widgets" target="_blank" rel="noopener noreferrer">web app</a>, then update the metric value using our API, add a widget to your lock screen and it will fetch the latest update automatically.
-
-<p align="center">
-  <img src="https://cdn.activitysmith.com/features/create-widget-metric.png" alt="Create widget metric" width="680" />
-</p>
+![Create widget metric](https://cdn.activitysmith.com/features/create-widget-metric.png)
 
 Use the metric key to update its value.
 
 ```bash
-activitysmith metrics update deploy.success_rate 99.9
 ```
 
 String metric values work too.
 
 ```bash
-activitysmith metrics update prod.status healthy
 ```
 
 ## App Icon Badge Count
 
-<p align="center">
-  <img src="https://cdn.activitysmith.com/features/badge-count.png" alt="ActivitySmith app icon with an App Icon Badge Count" width="680" />
-</p>
+![ActivitySmith app icon with an App Icon Badge Count](https://cdn.activitysmith.com/features/badge-count.png)
 
 Show the number you care about on your ActivitySmith app icon. Track MRR, a customer count, a stock price, or any other value you want to keep in view.
 
-Set or update the badge value.
+### Set or update the badge value
 
 ```bash
 activitysmith badge 8333
 ```
 
-To clear the badge, set its value to 0.
+### Clear the badge
+
+Pass `0` to clear the badge.
 
 ```bash
 activitysmith badge 0
-```
-
-## Channels
-
-Use `--channels` to target specific team members or devices
-
-### Push Notifications
-
-```bash
-activitysmith push \
-  --title "New subscription 💸" \
-  --message "Customer upgraded to Pro plan" \
-  --channels "sales,customer-success"
-```
-
-### Live Activities
-
-```bash
-activitysmith activity start \
-  --title "Nightly Database Backup" \
-  --subtitle "verify restore" \
-  --type progress \
-  --percentage 62 \
-  --channels "sales,customer-success"
-```
-
-### App Icon Badge Count
-
-```bash
-activitysmith badge 3 --channels "sales,customer-success"
 ```
 
 ## Tags
@@ -607,75 +481,81 @@ activitysmith push \
   --tags "user:382,billing"
 ```
 
-## Aliases
+For `activity stream`, `activity update`, and `activity end`, omit `--tags` to keep existing Tags, pass `--tags` to replace them, or use `--clear-tags` to remove them. `--tags` and `--clear-tags` cannot be used together.
 
-The CLI installs two bin names:
+```bash
+  --title "Customer Import" \
+  --type progress \
+  --percentage 60 \
+  --clear-tags
+```
 
-- `activitysmith` (recommended)
-- `activitysmith-cli` (alias)
+`activity end-stream` also accepts `--tags` or `--clear-tags` to replace or clear Tags in the final history entry. Omit both flags to preserve them.
 
-## Content State Options
+## Metadata
 
-For `activity stream|start|update|end|end-stream`, you can pass content state via JSON:
+Metadata adds information to Push Notification and Live Activity details in ActivitySmith. It does not appear in the notification or Live Activity on your device.
 
-- `--content-state <json>`
-- `--content-state-file <path>`
+```bash
+activitysmith push \
+  --title "New subscription 💸" \
+  --metadata '{"customer_id":"382","plan":"Pro","amount":29,"trial":false}'
 
-For `metrics` and `stats`, you can also pass the metrics array directly:
+activitysmith activity stream customer-import \
+  --title "Customer Import" \
+  --type progress \
+  --percentage 60 \
+  --metadata '{"job_id":"import-382","records":1200}'
+```
 
-- `--metrics <json-array>`
-- `--metrics-file <path>`
+Use `--metadata` or `--metadata-file` with `push`, `activity stream`, `activity start`, `activity update`, `activity end`, or `activity end-stream`. Omit both options to keep existing Metadata. Supply an object to replace it, or use `--metadata '{}'` to clear it. The two options cannot be combined.
 
-Or use flags to build the rest of the payload:
+Values can be strings, numbers, or booleans. Metadata supports up to 50 entries and 16 KB of JSON, with keys up to 100 characters and strings up to 4,000 characters. Nested objects, arrays, and null values are not supported.
 
-- `--title <title>`
-- `--subtitle <subtitle>`
-- `--type <type>`
-- `--number-of-steps <number>`
-- `--current-step <number>`
-- `--percentage <number>`
-- `--value <number>`
-- `--upper-limit <number>`
-- `--duration-seconds <number>`
-- `--counts-down <true|false>`
-- `--color <color>`
-- `--step-color <color>`
-- `--auto-dismiss-minutes <number>`
+## Channels
 
-For `timer`, use `--duration-seconds` for a countdown. To start at 00:00 and count up, use `--counts-down false` and leave out `--duration-seconds`.
+Use `--channels` to target specific team members or devices when sending Push Notifications, Live Activities, or App Icon Badge Count updates. Omit it for account-wide delivery.
 
-Live Activity action options:
+```bash
+activitysmith push \
+  --title "Build Failed 🚨" \
+  --message "CI pipeline failed on main branch" \
+  --channels "devs,ops"
+```
 
-- `--action <json>`
-- `--action-file <path>`
-- `--secondary-action <json>`
-- `--secondary-action-file <path>`
+```bash
+activitysmith activity stream nightly-backup \
+  --content-state '{
+    "title": "Nightly database backup",
+    "type": "segmented_progress",
+    "numberOfSteps": 4,
+    "currentStep": 1
+  }' \
+  --channels "devs,ops"
+```
 
-Targeting options:
-
-- `--channels <comma-separated-slugs>` (for `push`, `badge`, `activity stream`, and `activity start`)
-
-Organization options:
-
-- `--tags <comma-separated-tags>` (for `push`, `activity stream`, and `activity start`; repeat the option to add more tags)
-
-Widget metric options:
-
-- `activitysmith metrics update <metric-key> <value>`
-- `activitysmith metric update <metric-key> <value>` (alias)
-
-Required fields:
-
-- `activity stream`: `--title`, `--type`, plus `--metrics`, `--number-of-steps` and `--current-step`, `--percentage`, `--value` with `--upper-limit`, or timer fields
-- `activity start`: `--title`, `--type`, plus `--metrics`, `--number-of-steps` and `--current-step`, `--percentage`, `--value` with `--upper-limit`, or timer fields
-- `activity update`: `--title`, plus `--metrics`, `--current-step`, `--percentage`, `--value` with `--upper-limit`, or timer fields
-- `activity end`: `--title`, plus `--metrics`, `--current-step`, `--percentage`, `--value` with `--upper-limit`, or timer fields
-- `activity end-stream`: no content state is required, but if you provide one it follows the same rules as `activity end`
+```bash
+activitysmith badge 3 --channels "sales,customer-success"
+```
 
 ## Output
 
-Use `--json` for machine-readable output.
+Use `--json` for machine-readable output:
 
 ```bash
 activitysmith push --title "Hello" --json
 ```
+
+## Error Handling
+
+The CLI exits non-zero on non-2xx responses and prints the API error body. That includes validation failures, rate limits, and Live Activity limit errors.
+
+## Additional Resources
+
+### [NPM Package](https://www.npmjs.com/package/activitysmith-cli)
+
+Install the ActivitySmith CLI from npm
+
+### [Source Code](https://github.com/ActivitySmithHQ/activitysmith-cli)
+
+View the CLI source on GitHub
