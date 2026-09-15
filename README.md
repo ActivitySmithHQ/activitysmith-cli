@@ -515,6 +515,7 @@ Metadata adds extra information to Push Notification and Live Activity details i
 ```bash
 activitysmith push \
   --title "New subscription 💸" \
+  --message "Customer upgraded to Pro plan" \
   --metadata '{"customer_id":"382","plan":"Pro","amount":29,"trial":false}'
 
 activitysmith activity stream customer-import \
