@@ -582,7 +582,3 @@ The CLI exits non-zero on non-2xx responses and prints the API error body. That 
 ### [NPM Package](https://www.npmjs.com/package/activitysmith-cli)
 
 Install the ActivitySmith CLI from npm
-
-### [Source Code](https://github.com/ActivitySmithHQ/activitysmith-cli)
-
-View the CLI source on GitHub
