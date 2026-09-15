@@ -516,13 +516,21 @@ Metadata adds extra information to Push Notification and Live Activity details i
 activitysmith push \
   --title "New subscription 💸" \
   --message "Customer upgraded to Pro plan" \
-  --metadata '{"customer_id":"382","plan":"Pro","amount":29,"trial":false}'
+  --metadata '{
+    "customer_id": "382",
+    "plan": "Pro",
+    "amount": 29,
+    "trial": false
+  }'
 
 activitysmith activity stream customer-import \
   --title "Customer Import" \
   --type progress \
   --percentage 60 \
-  --metadata '{"job_id":"import-382","records":1200}'
+  --metadata '{
+    "job_id": "import-382",
+    "records": 1200
+  }'
 ```
 
 Values can be strings, numbers, or booleans. Metadata supports up to 50 entries and 16 KB of JSON, with keys up to 100 characters and strings up to 4,000 characters. Nested objects, arrays, and null values are not supported.
