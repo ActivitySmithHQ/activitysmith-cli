@@ -288,6 +288,7 @@ Add more context to Live Activities with icons and badges.
 #### Icon
 
 ```bash
+activitysmith activity stream prod-web-1 \
   --content-state '{
     "title": "Server Health",
     "type": "metrics",
@@ -304,6 +305,7 @@ The `icon.symbol` value is an Apple SF Symbol name. Browse the catalog in the Ac
 #### Badge
 
 ```bash
+activitysmith activity stream nightly-backup \
   --content-state '{
     "title": "Nightly Database Backup",
     "type": "segmented_progress",
@@ -443,11 +445,13 @@ ActivitySmith lets you display any value on your Lock Screen with widgets - SaaS
 Use the metric key to update its value.
 
 ```bash
+activitysmith metrics update deploy.success_rate 99.9
 ```
 
 String metric values work too.
 
 ```bash
+activitysmith metrics update prod.status healthy
 ```
 
 ## App Icon Badge Count
@@ -484,6 +488,7 @@ activitysmith push \
 For `activity stream`, `activity update`, and `activity end`, omit `--tags` to keep existing Tags, pass `--tags` to replace them, or use `--clear-tags` to remove them. `--tags` and `--clear-tags` cannot be used together.
 
 ```bash
+activitysmith activity stream customer-import \
   --title "Customer Import" \
   --type progress \
   --percentage 60 \
