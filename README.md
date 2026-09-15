@@ -508,6 +508,26 @@ Pass `0` to clear the badge.
 activitysmith badge 0
 ```
 
+## Metadata
+
+Metadata adds information to Push Notification and Live Activity details in ActivitySmith. It does not appear in the notification or Live Activity on your device.
+
+```bash
+activitysmith push \
+  --title "New subscription 💸" \
+  --metadata '{"customer_id":"382","plan":"Pro","amount":29,"trial":false}'
+
+activitysmith activity stream customer-import \
+  --title "Customer Import" \
+  --type progress \
+  --percentage 60 \
+  --metadata '{"job_id":"import-382","records":1200}'
+```
+
+Use `--metadata` or `--metadata-file` with `push`, `activity stream`, `activity start`, `activity update`, `activity end`, or `activity end-stream`. Omit both options to keep existing Metadata. Supply an object to replace it, or use `--metadata '{}'` to clear it. The two options cannot be combined.
+
+Values can be strings, numbers, or booleans. Metadata supports up to 50 entries and 16 KB of JSON, with keys up to 100 characters and strings up to 4,000 characters. Nested objects, arrays, and null values are not supported.
+
 ## Tags
 
 Use `tags` to organize and filter your Push Notification and Live Activity history. Tags are created automatically when you first use them.
@@ -530,26 +550,6 @@ activitysmith activity stream customer-import \
 ```
 
 `activity end-stream` also accepts `--tags` or `--clear-tags` to replace or clear Tags in the final history entry. Omit both flags to preserve them.
-
-## Metadata
-
-Metadata adds information to Push Notification and Live Activity details in ActivitySmith. It does not appear in the notification or Live Activity on your device.
-
-```bash
-activitysmith push \
-  --title "New subscription 💸" \
-  --metadata '{"customer_id":"382","plan":"Pro","amount":29,"trial":false}'
-
-activitysmith activity stream customer-import \
-  --title "Customer Import" \
-  --type progress \
-  --percentage 60 \
-  --metadata '{"job_id":"import-382","records":1200}'
-```
-
-Use `--metadata` or `--metadata-file` with `push`, `activity stream`, `activity start`, `activity update`, `activity end`, or `activity end-stream`. Omit both options to keep existing Metadata. Supply an object to replace it, or use `--metadata '{}'` to clear it. The two options cannot be combined.
-
-Values can be strings, numbers, or booleans. Metadata supports up to 50 entries and 16 KB of JSON, with keys up to 100 characters and strings up to 4,000 characters. Nested objects, arrays, and null values are not supported.
 
 ## Channels
 
