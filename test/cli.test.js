@@ -308,3 +308,25 @@ test("end-stream rejects conflicting Tags flags", async () => {
   const result = await runCli(["activity","end-stream","job","--tags","finished","--clear-tags"]);
   assert.notEqual(result.code,0); assert.equal(result.request,null);
 });
+
+for (const value of ['$1,240', '0007', '', 0, -12.75]) {
+  test(`Value preserves ${JSON.stringify(value)} through JSON`, async () => {
+    const result = await runCli(['activity', 'stream', 'revenue', '--content-state', JSON.stringify({title:'Revenue', type:'value', value})]);
+    assert.equal(result.code, 0, result.stderr);
+    assert.equal(result.request.body.content_state.value, value);
+  });
+}
+for (const value of ['$1,240', '0007', '0']) {
+  test(`Value flag preserves ${value}`, async () => {
+    const result = await runCli(['activity', 'stream', 'revenue', '--title', 'Revenue', '--type', 'value', '--value', value]);
+    assert.equal(result.code, 0, result.stderr);
+    assert.equal(result.request.body.content_state.value, value);
+  });
+}
+for (const value of [undefined, null, true, {}, []]) {
+  test(`Value rejects ${JSON.stringify(value)}`, async () => {
+    const result = await runCli(['activity', 'stream', 'revenue', '--content-state', JSON.stringify({title:'Revenue', type:'value', value})]);
+    assert.notEqual(result.code, 0);
+    assert.equal(result.request, null);
+  });
+}
