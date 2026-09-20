@@ -214,9 +214,8 @@ const addContentStateOptions = (command, { includeAutoDismiss, includeAutoDismis
       parseNumberOption("percentage")
     )
     .option(
-      "--value <number>",
-      "Content state value",
-      parseNumberOption("value")
+      "--value <value>",
+      "Formatted Value readout, or numeric progress value"
     )
     .option(
       "--upper-limit <number>",
@@ -388,10 +387,11 @@ const validateContentState = (contentState, mode) => {
     normalizedType !== "metrics" &&
     normalizedType !== "stats" &&
     normalizedType !== "alert" &&
-    normalizedType !== "timer"
+    normalizedType !== "timer" &&
+    normalizedType !== "value"
   ) {
     throw new Error(
-      "contentState.type must be one of: segmented_progress, progress, metrics, stats, alert, timer"
+      "contentState.type must be one of: segmented_progress, progress, metrics, stats, alert, timer, value"
     );
   }
 
@@ -416,7 +416,7 @@ const validateContentState = (contentState, mode) => {
     }
   }
 
-  if (hasValue !== hasUpperLimit) {
+  if (normalizedType !== "value" && hasValue !== hasUpperLimit) {
     throw new Error(
       "contentState.value and contentState.upperLimit must be provided together"
     );
@@ -450,7 +450,7 @@ const validateContentState = (contentState, mode) => {
   }
 
   const hasSegmentedFields = hasNumberOfSteps || hasCurrentStep || hasStepColor;
-  const hasProgressFields = hasPercentage || hasValue || hasUpperLimit;
+  const hasProgressFields = hasPercentage || (hasValue && normalizedType !== "value") || hasUpperLimit;
   const hasAlertFields = hasMessage || hasIcon || hasBadge;
 
   if (hasIcon) {
@@ -547,6 +547,16 @@ const validateContentState = (contentState, mode) => {
         }
       }
     });
+  }
+
+  if (normalizedType === "value") {
+    if (!hasValue || !(typeof contentState.value === "string" || Number.isFinite(contentState.value))) {
+      throw new Error("Value requires contentState.value as a string or finite number");
+    }
+    if (hasProgressFields || hasSegmentedFields || hasMetrics || hasTimerFields || hasMessage) {
+      throw new Error("Do not mix Value with other Live Activity type fields");
+    }
+    return;
   }
 
   const effectiveType = normalizedType;
@@ -850,7 +860,9 @@ const buildContentStateFromOptions = (options) => {
   }
 
   if (options.value !== undefined) {
-    contentState.value = options.value;
+    contentState.value = options.type === "value"
+      ? options.value
+      : parseNumberOption("value")(options.value);
   }
 
   if (options.upperLimit !== undefined) {
