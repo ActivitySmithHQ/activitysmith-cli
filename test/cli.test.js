@@ -330,3 +330,29 @@ for (const value of [undefined, null, true, {}, []]) {
     assert.equal(result.request, null);
   });
 }
+
+for (const level of ['passive', 'active', 'time-sensitive']) {
+  test(`push serializes icon and ${level} interruption level`, async () => {
+    const result = await runCli(['push', '--title', 'GitHub', '--subtitle', 'Build status', '--icon', 'https://example.com/github.png', '--interruption-level', level, '--channels', 'ops']);
+    assert.equal(result.code, 0, result.stderr);
+    assert.equal(result.request.body.icon, 'https://example.com/github.png');
+    assert.equal(result.request.body.interruption_level, level);
+    assert.equal(result.request.body.subtitle, 'Build status');
+    assert.deepEqual(result.request.body.target, {channels: ['ops']});
+  });
+}
+
+test('push omits icon and interruption level by default', async () => {
+  const result = await runCli(['push', '--title', 'Test']);
+  assert.equal(result.code, 0, result.stderr);
+  assert.ok(!Object.hasOwn(result.request.body, 'icon'));
+  assert.ok(!Object.hasOwn(result.request.body, 'interruption_level'));
+});
+
+test('push rejects invalid interruption levels and non-HTTPS icons before transport', async () => {
+  for (const args of [['--interruption-level', 'critical'], ['--interruption-level', 'timeSensitive'], ['--interruption-level', 'default'], ['--icon', 'http://example.com/icon.png']]) {
+    const result = await runCli(['push', '--title', 'Test', ...args]);
+    assert.notEqual(result.code, 0);
+    assert.equal(result.request, null);
+  }
+});
