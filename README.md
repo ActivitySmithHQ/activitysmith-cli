@@ -63,9 +63,9 @@ Set `--icon` to a publicly accessible HTTPS image URL to show an avatar or servi
 
 ```bash
 activitysmith push \
-  --title "GitHub" \
-  --message "Your pull request is ready for review." \
-  --icon "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png"
+  --title 'MRR just crossed $10,000 🎉' \
+  --message "Up 18% this month from 31 new subscriptions." \
+  --icon "https://cdn.activitysmith.com/integrations/icons/stripe.png"
 ```
 
 ### Rich Push Notifications with Media
@@ -201,9 +201,9 @@ Removing the interruption level from this example produces the same delivery beh
 
 ```bash
 activitysmith push \
-  --title "Deployment approval needed" \
-  --message "Approve the production deployment before the window closes." \
-  --icon "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" \
+  --title "Regression: PaymentTimeout" \
+  --message "Resolved last week, now 38 events in the past hour." \
+  --icon "https://cdn.activitysmith.com/integrations/icons/sentry.png" \
   --interruption-level "time-sensitive"
 ```
 
@@ -215,9 +215,9 @@ With a custom icon and Time Sensitive delivery:
 
 ```json
 {
-  "title": "Deployment approval needed",
-  "message": "Approve the production deployment before the window closes.",
-  "icon": "https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png",
+  "title": "Regression: PaymentTimeout",
+  "message": "Resolved last week, now 38 events in the past hour.",
+  "icon": "https://cdn.activitysmith.com/integrations/icons/sentry.png",
   "interruption_level": "time-sensitive"
 }
 ```
