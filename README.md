@@ -175,7 +175,7 @@ Use `--interruption-level` to choose how urgently iOS presents a Push Notificati
 | `active` | Normal delivery, subject to the device's notification settings and Focus. This is the default. |
 | `time-sensitive` | Can bypass Scheduled Summary and Focus when the user allows Time Sensitive Notifications for ActivitySmith. |
 
-Critical Alerts are not supported. See Apple's [interruption levels](https://developer.apple.com/documentation/usernotifications/unnotificationinterruptionlevel) for the system behavior.
+See Apple's [interruption levels](https://developer.apple.com/documentation/usernotifications/unnotificationinterruptionlevel) for the system behavior.
 
 #### Passive
 
