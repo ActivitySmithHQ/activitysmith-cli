@@ -167,6 +167,8 @@ activitysmith push \
 
 ### Push Notification Interruption Levels
 
+![Time Sensitive Push Notification](https://cdn.activitysmith.com/features/time-sensitive-push-notifications.png)
+
 Use `--interruption-level` to choose how urgently iOS presents a Push Notification. Omit it for normal delivery. Explicit `active` has the same behavior as the default. Requires ActivitySmith for iOS 1.16.0 or later.
 
 | Value | Behavior |
