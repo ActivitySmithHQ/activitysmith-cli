@@ -1265,7 +1265,7 @@ program
     "--media <url>",
     "HTTPS URL for image, audio, or video shown when the notification is expanded"
   )
-  .option("--icon <url>", "HTTPS image URL for the notification icon, such as an avatar or service logo")
+  .option("--icon <url>", "HTTPS image URL for the notification icon, such as a logo or avatar")
   .addOption(
     new Option("--interruption-level <level>", "Notification interruption level").choices([
       "passive",
