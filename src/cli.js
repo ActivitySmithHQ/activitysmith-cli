@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { Command, InvalidArgumentError } from "commander";
+import { Command, InvalidArgumentError, Option } from "commander";
 import { loadMetadata } from "./metadata.js";
 import ActivitySmith from "activitysmith";
 import { createRequire } from "module";
@@ -1265,6 +1265,14 @@ program
     "--media <url>",
     "HTTPS URL for image, audio, or video shown when the notification is expanded"
   )
+  .option("--icon <url>", "HTTPS image URL for the notification icon, such as an avatar or service logo")
+  .addOption(
+    new Option("--interruption-level <level>", "Notification interruption level").choices([
+      "passive",
+      "active",
+      "time-sensitive",
+    ])
+  )
   .option("--redirection <url>", "HTTPS or shortcuts:// URL opened when notification is tapped")
   .option("--actions <json>", "Actions JSON array (max 4)")
   .option("--actions-file <path>", "Path to actions JSON array file")
@@ -1301,6 +1309,11 @@ program
             options.media !== undefined
               ? normalizeHttpsUrl(options.media, "media")
               : undefined,
+          icon:
+            options.icon !== undefined
+              ? normalizeHttpsUrl(options.icon, "icon")
+              : undefined,
+          interruption_level: options.interruptionLevel,
           redirection:
             options.redirection !== undefined
               ? normalizeOpenUrl(options.redirection, "redirection")
