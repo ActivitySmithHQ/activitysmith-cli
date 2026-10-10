@@ -1417,6 +1417,10 @@ addLiveActivityActionOptions(addContentStateOptions(
   activityCommand
     .command("stream")
     .description("Send a stateless Live Activity stream update")
+    .addHelpText(
+      "after",
+      "\niOS limits how often a Live Activity can update. Send one or two updates every five minutes.\n"
+    )
     .argument("<stream-key>", "Stable stream key")
     .option(
       "--channels <channels>",
