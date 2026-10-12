@@ -1,3 +1,7 @@
+## 1.14.0
+
+Adds `push --replace <notification-id>` to silently replace a Push Notification you already sent. The replacement takes the old notification's place on the Lock Screen and in history. Every push now prints its Notification ID, and the human-readable output shows the number of devices notified again.
+
 ## 1.13.0
 
 Adds custom icons and interruption levels for Push Notifications. Set `--icon` to show a service logo or avatar on the notification, and `--interruption-level` to deliver it as `passive`, `active`, or `time-sensitive`.

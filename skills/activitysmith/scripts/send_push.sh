@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
   cat <<'USAGE'
-Usage: send_push.sh -m "message" [-t "title"] [-s "subtitle"] [-c "channels"] [-g "tags"] [-M "media"] [-r "redirection"] [-a "actions-json"] [-A "actions-file"]
+Usage: send_push.sh -m "message" [-t "title"] [-s "subtitle"] [-c "channels"] [-g "tags"] [-M "media"] [-r "redirection"] [-a "actions-json"] [-A "actions-file"] [-R "notification-id"]
 
 Required:
   -m  Push message
@@ -17,6 +17,8 @@ Optional:
   -r  Redirection HTTPS or shortcuts:// URL (opened on notification tap)
   -a  Actions JSON array string (max 4 actions)
   -A  Path to actions JSON array file
+  -R  Notification ID to silently replace instead of sending a new push
+      (cannot be combined with -c)
 USAGE
 }
 
@@ -29,8 +31,9 @@ media=""
 redirection=""
 actions_json=""
 actions_file=""
+replace_id=""
 
-while getopts ":m:t:s:c:g:M:r:a:A:h" opt; do
+while getopts ":m:t:s:c:g:M:r:a:A:R:h" opt; do
   case "$opt" in
     m) message="$OPTARG" ;;
     t) title="$OPTARG" ;;
@@ -41,6 +44,7 @@ while getopts ":m:t:s:c:g:M:r:a:A:h" opt; do
     r) redirection="$OPTARG" ;;
     a) actions_json="$OPTARG" ;;
     A) actions_file="$OPTARG" ;;
+    R) replace_id="$OPTARG" ;;
     h) usage; exit 0 ;;
     \?) echo "Unknown option: -$OPTARG"; usage; exit 1 ;;
     :) echo "Missing value for -$OPTARG"; usage; exit 1 ;;
@@ -65,6 +69,12 @@ if [[ -n "$media" && ( -n "$actions_json" || -n "$actions_file" ) ]]; then
   exit 1
 fi
 
+if [[ -n "$replace_id" && -n "$channels" ]]; then
+  echo "Replacements go to the original recipients; -c cannot be combined with -R."
+  usage
+  exit 1
+fi
+
 # shellcheck disable=SC1091
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 load_env_if_present
@@ -72,6 +82,9 @@ require_api_key
 require_cli
 
 cmd=(push --title "$title" --message "$message")
+if [[ -n "$replace_id" ]]; then
+  cmd+=(--replace "$replace_id")
+fi
 if [[ -n "$subtitle" ]]; then
   cmd+=(--subtitle "$subtitle")
 fi

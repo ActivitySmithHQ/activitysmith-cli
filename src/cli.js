@@ -1257,8 +1257,12 @@ const outputResult = (payload, options, lines) => {
 
 program
   .command("push")
-  .description("Send a push notification")
+  .description("Send a push notification, or replace one you already sent")
   .requiredOption("--title <title>", "Push title")
+  .option(
+    "--replace <notification-id>",
+    "Silently replace a sent push notification, using the notification ID from its send output"
+  )
   .option("--message <message>", "Push message")
   .option("--subtitle <subtitle>", "Push subtitle")
   .option(
@@ -1299,6 +1303,16 @@ program
         media: options.media,
         actions,
       });
+      if (options.replace !== undefined) {
+        if (options.channels !== undefined || options.interruptionLevel !== undefined) {
+          throw new Error(
+            "--channels and --interruption-level cannot be combined with --replace. Replacements go to the original recipients and arrive silently."
+          );
+        }
+        if (options.replace.trim() === "") {
+          throw new Error("--replace requires the notification ID from the original push output.");
+        }
+      }
 
       const pushNotificationRequest = withTargetChannels(
         {
@@ -1325,18 +1339,24 @@ program
         options.channels
       );
 
-      const response = await client.notifications.sendPushNotification({
-        pushNotificationRequest,
-      });
+      const isReplacement = options.replace !== undefined;
+      const response = isReplacement
+        ? await client.notifications.replace(options.replace.trim(), pushNotificationRequest)
+        : await client.notifications.sendPushNotification({
+            pushNotificationRequest,
+          });
+      const devicesNotified = response?.devices_notified ?? response?.devicesNotified;
+      const notificationId = response?.notification_id ?? response?.notificationId;
 
       outputResult(response, globalOptions, [
-        "Push sent.",
+        isReplacement ? "Push replaced." : "Push sent.",
         response?.success !== undefined
           ? `Success: ${response.success}`
           : null,
-        response?.devicesNotified !== undefined
-          ? `Devices notified: ${response.devicesNotified}`
+        devicesNotified !== undefined
+          ? `Devices notified: ${devicesNotified}`
           : null,
+        notificationId ? `Notification ID: ${notificationId}` : null,
       ]);
     } catch (error) {
       await handleError(error, globalOptions);

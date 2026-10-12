@@ -8,11 +8,14 @@ const runCli = (args) =>
       globalThis.fetch = async (url, init) => {
         process.stdout.write("CAPTURE:" + JSON.stringify({
           url,
+          method: init.method,
           body: init.body ? JSON.parse(init.body) : null
         }) + "\\n");
         return new Response(JSON.stringify({
           success: true,
           activity_id: "activity-1",
+          notification_id: "pn-1",
+          devices_notified: 1,
           operation: "started"
         }), {
           status: 200,
@@ -353,6 +356,36 @@ test('push rejects invalid interruption levels and non-HTTPS icons before transp
   for (const args of [['--interruption-level', 'critical'], ['--interruption-level', 'timeSensitive'], ['--interruption-level', 'default'], ['--icon', 'http://example.com/icon.png']]) {
     const result = await runCli(['push', '--title', 'Test', ...args]);
     assert.notEqual(result.code, 0);
+    assert.equal(result.request, null);
+  }
+});
+
+test("push --replace silently replaces a sent push notification", async () => {
+  const result = await runCli([
+    "push",
+    "--replace",
+    "pn-1",
+    "--title",
+    "Answered from desk",
+    "--message",
+    "No input needed",
+  ]);
+
+  assert.equal(result.code, 0, result.stderr);
+  assert.equal(result.request.method, "PUT");
+  assert.match(result.request.url, /\/push-notification\/pn-1$/);
+  assert.deepEqual(result.request.body, {
+    title: "Answered from desk",
+    message: "No input needed",
+  });
+});
+
+test("push --replace rejects options that only apply to new sends", async () => {
+  for (const extra of [["--channels", "ops"], ["--interruption-level", "passive"]]) {
+    const result = await runCli(["push", "--replace", "pn-1", "--title", "Done", ...extra]);
+
+    assert.notEqual(result.code, 0);
+    assert.match(result.stdout + result.stderr, /cannot be combined with --replace/);
     assert.equal(result.request, null);
   }
 });

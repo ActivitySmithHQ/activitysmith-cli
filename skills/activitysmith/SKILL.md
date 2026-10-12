@@ -34,6 +34,7 @@ export ACTIVITYSMITH_API_KEY="..."
 ## Pick The Right Signal
 
 - Push Notification: one important event, completion, blocker, review request, or handoff.
+- Push Notification replacement: an earlier Push Notification is out of date and should be swapped, not stacked.
 - Push Notification with redirection: tapping the notification should open a URL or run a specific Shortcut that already exists on the user's iPhone.
 - Push Notification with actions: long-press should show up to 4 buttons.
 - Live Activity: a real-time metric, operational state, or ongoing task should stay visible.
@@ -63,6 +64,22 @@ Use this when the user says "notify me when done" or when a long task completes.
 ./skills/activitysmith/scripts/send_push.sh \
   -t "Task finished" \
   -m "Your agent finished the task."
+```
+
+### Replace A Notification Once It Is Handled
+
+Use this when an earlier Push Notification is out of date, for example the user already answered from their computer. Every push prints a `Notification ID`. Pass it with `-R` to swap the old notification for the new one on the Lock Screen and in history. The replacement is silent and goes to the same recipients.
+
+```bash
+./skills/activitysmith/scripts/send_push.sh \
+  -t "Input needed" \
+  -m "Approve the migration to continue."
+# Output includes: Notification ID: Xk3pQ8mV2nR7tL9wB4yZ
+
+./skills/activitysmith/scripts/send_push.sh \
+  -R "Xk3pQ8mV2nR7tL9wB4yZ" \
+  -t "Answered from desk" \
+  -m "Migration approved. Nothing needed here."
 ```
 
 ### Notify With A Shortcut Tap Target
