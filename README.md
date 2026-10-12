@@ -210,6 +210,22 @@ activitysmith push \
   --interruption-level "time-sensitive"
 ```
 
+### Replace a Push Notification
+
+Every `push` prints a `Notification ID`. Pass it to `--replace` to update a Push Notification you already sent, for example when an incident you alerted on is resolved. The replacement takes the old notification's place on the Lock Screen and in history instead of stacking a second one. It arrives silently, without sound or waking the screen, and goes to the same recipients as the original, so `--channels` and `--interruption-level` don't apply.
+
+```bash
+activitysmith push \
+  --title "🚨 checkout-api is down" \
+  --message "500 errors on 62% of requests."
+# Notification ID: Xk3pQ8mV2nR7tL9wB4yZ
+
+activitysmith push \
+  --replace "Xk3pQ8mV2nR7tL9wB4yZ" \
+  --title "✅ checkout-api recovered" \
+  --message "Error rate is back to normal. Incident resolved."
+```
+
 ## Live Activities
 
 Choose the Live Activity type that matches what you want to show:
