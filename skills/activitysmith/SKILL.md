@@ -66,20 +66,20 @@ Use this when the user says "notify me when done" or when a long task completes.
   -m "Your agent finished the task."
 ```
 
-### Replace A Notification Once It Is Handled
+### Replace A Notification When The Status Changes
 
-Use this when an earlier Push Notification is out of date, for example the user already answered from their computer. Every push prints a `Notification ID`. Pass it with `-R` to swap the old notification for the new one on the Lock Screen and in history. The replacement is silent and goes to the same recipients.
+Use this to update a Push Notification you already sent, for example when an incident you alerted on is resolved. Every push prints a `Notification ID`. Pass it with `-R` to swap the old notification for the new one on the Lock Screen and in history. The replacement is silent and goes to the same recipients.
 
 ```bash
 ./skills/activitysmith/scripts/send_push.sh \
-  -t "Input needed" \
-  -m "Approve the migration to continue."
+  -t "🚨 checkout-api is down" \
+  -m "500 errors on 62% of requests."
 # Output includes: Notification ID: Xk3pQ8mV2nR7tL9wB4yZ
 
 ./skills/activitysmith/scripts/send_push.sh \
   -R "Xk3pQ8mV2nR7tL9wB4yZ" \
-  -t "Answered from desk" \
-  -m "Migration approved. Nothing needed here."
+  -t "✅ checkout-api recovered" \
+  -m "Error rate is back to normal. Incident resolved."
 ```
 
 ### Notify With A Shortcut Tap Target
