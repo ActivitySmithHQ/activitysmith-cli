@@ -61,13 +61,13 @@ activitysmith push \
 
 ![Push Notifications with custom icons](https://cdn.activitysmith.com/features/push-notifications-with-custom-icons.png)
 
-Set `--icon` to a publicly accessible HTTPS image URL to show a logo or avatar alongside a smaller ActivitySmith app icon. With a custom icon, iOS may omit the subtitle from the notification.
+Set `--icon` to a publicly accessible HTTPS image URL to show a logo or avatar alongside a smaller ActivitySmith app icon. Host the image anywhere, such as on your own website or CDN. With a custom icon, iOS may omit the subtitle from the notification.
 
 ```bash
 activitysmith push \
   --title 'MRR just crossed $10,000 🎉' \
   --message "Up 18% this month from 31 new subscriptions." \
-  --icon "https://cdn.activitysmith.com/integrations/icons/stripe.png"
+  --icon "https://example.com/icons/stripe.png"
 ```
 
 ### Rich Push Notifications with Media
