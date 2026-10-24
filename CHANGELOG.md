@@ -1,3 +1,7 @@
+## 1.15.0
+
+Adds browser sign-in. Run `activitysmith auth login`, approve access in your browser, and commands work without an API key. `activitysmith auth status` shows how the CLI authenticates, and `activitysmith auth logout` disconnects it from your account. `--api-key` and `ACTIVITYSMITH_API_KEY` still work and take precedence, so CI pipelines can keep using API keys.
+
 ## 1.14.0
 
 Adds the ability to replace a Push Notification you already sent with a new one.

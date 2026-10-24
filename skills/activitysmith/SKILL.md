@@ -20,16 +20,18 @@ The CLI is the tool. This skill is the intent mapping and recipe layer.
 ## Requirements
 
 - `activitysmith` must be available in `PATH`.
-- `ACTIVITYSMITH_API_KEY` must be set in the shell or in `skills/activitysmith/.env`.
+- The CLI must be signed in with `activitysmith auth login`, or have `ACTIVITYSMITH_API_KEY` set in the shell or in `skills/activitysmith/.env`.
 - Use bundled scripts from `./skills/activitysmith/scripts/` when available.
 - Use direct `activitysmith ...` commands for simple one-liners or widget metrics.
 - Examples below assume the skill is installed at `./skills/activitysmith`. If not, replace that prefix with the actual skill directory.
 
-If auth is missing, tell the user to set:
+If auth is missing (`activitysmith auth status` says it is not signed in), run:
 
 ```bash
-export ACTIVITYSMITH_API_KEY="..."
+activitysmith auth login
 ```
+
+It opens the user's browser and waits until they approve, then saves the sign-in for this machine. If no browser can open, it prints a URL for the user to visit. Never ask the user to paste an API key into chat.
 
 ## Pick The Right Signal
 

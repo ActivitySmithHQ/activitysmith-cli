@@ -13,11 +13,18 @@ load_env_if_present() {
   fi
 }
 
+# Accepts ACTIVITYSMITH_API_KEY or the sign-in saved by `activitysmith auth login`.
 require_api_key() {
-  if [[ -z "${ACTIVITYSMITH_API_KEY:-}" ]]; then
-    echo "ACTIVITYSMITH_API_KEY is not set. Export it or set it in skills/activitysmith/.env"
-    exit 1
+  if [[ -n "${ACTIVITYSMITH_API_KEY:-}" ]]; then
+    return
   fi
+  if command -v activitysmith >/dev/null 2>&1 &&
+    activitysmith --json auth status 2>/dev/null | grep -q '"auth_source": "auth login"'; then
+    return
+  fi
+  echo "Not signed in to ActivitySmith. Run: activitysmith auth login"
+  echo "Or export ACTIVITYSMITH_API_KEY, or set it in skills/activitysmith/.env"
+  exit 1
 }
 
 require_cli() {
@@ -28,5 +35,9 @@ require_cli() {
 }
 
 run_activitysmith() {
-  activitysmith --api-key "$ACTIVITYSMITH_API_KEY" "$@"
+  if [[ -n "${ACTIVITYSMITH_API_KEY:-}" ]]; then
+    activitysmith --api-key "$ACTIVITYSMITH_API_KEY" "$@"
+  else
+    activitysmith "$@"
+  fi
 }

@@ -24,9 +24,53 @@ For example, a Codex agent can work on your computer, send a Push Notification w
 
 ## Quickstart
 
+1. Run `activitysmith auth login` and approve access in your browser.
+2. Run `activitysmith --help` to inspect available commands.
+
+```bash
+activitysmith auth login
+
+activitysmith push --title "Hello"
+```
+
+## Authentication
+
+### Sign in with your browser
+
+`activitysmith auth login` opens your browser to the ActivitySmith approval screen. Select **Approve**. The CLI saves the sign-in to `~/.config/activitysmith/credentials.json` with owner-only file permissions, and every command then uses it. No API key is created.
+
+```bash
+activitysmith auth login
+```
+
+If no browser can open, for example over SSH, the CLI prints the sign-in URL. Open it in any browser. After you approve, paste the address the browser lands on back into the terminal.
+
+```bash
+activitysmith auth login --no-browser
+```
+
+The CLI appears under AI Agents in the ActivitySmith web app. Select **Disconnect** there to stop it immediately on every machine.
+
+Check how the CLI authenticates. Secrets are never printed:
+
+```bash
+activitysmith auth status
+```
+
+Sign out to disconnect the CLI and remove the saved sign-in from this machine:
+
+```bash
+activitysmith auth logout
+```
+
+Set `ACTIVITYSMITH_CONFIG_DIR` to save the sign-in in a different directory.
+
+### Use an API key
+
 1. [Create an API key](https://activitysmith.com/app/keys)
-2. Authenticate with `ACTIVITYSMITH_API_KEY` or pass `--api-key` per command.
-3. Run `activitysmith --help` to inspect available commands.
+2. Set `ACTIVITYSMITH_API_KEY` or pass `--api-key` per command.
+
+Use an API key for CI pipelines, servers, and other machines where nobody can approve a browser sign-in. The CLI uses `--api-key` first, then `ACTIVITYSMITH_API_KEY`, then the sign-in from `activitysmith auth login`.
 
 Use the environment variable when you want the cleanest shell scripts:
 

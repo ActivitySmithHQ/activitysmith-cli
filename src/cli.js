@@ -2,6 +2,7 @@
 
 import { Command, InvalidArgumentError, Option } from "commander";
 import { loadMetadata } from "./metadata.js";
+import { credentialsPath, getAccessToken, login, logout, readCredentials } from "./auth.js";
 import ActivitySmith from "activitysmith";
 import { createRequire } from "module";
 import { readFile } from "fs/promises";
@@ -18,7 +19,7 @@ program
   .version(version)
   .option(
     "--api-key <key>",
-    "ActivitySmith API key (defaults to ACTIVITYSMITH_API_KEY)"
+    "ActivitySmith API key (defaults to ACTIVITYSMITH_API_KEY, then the sign-in from auth login)"
   )
   .option("--json", "Output JSON");
 
@@ -267,8 +268,12 @@ const addLiveActivityActionOptions = (command) =>
       "Secondary Live Activity action JSON file path"
     );
 
-const getApiKey = (options) =>
-  options.apiKey || process.env.ACTIVITYSMITH_API_KEY;
+// Precedence: --api-key, then ACTIVITYSMITH_API_KEY, then the sign-in saved by `auth login`.
+const credentialSource = (options) => {
+  if (options.apiKey) return "--api-key";
+  if (process.env.ACTIVITYSMITH_API_KEY) return "ACTIVITYSMITH_API_KEY";
+  return readCredentials() ? "auth login" : null;
+};
 
 const createClient = (apiKey) =>
   new ActivitySmith({
@@ -1203,8 +1208,16 @@ const buildErrorDetails = async (error) => {
   return details;
 };
 
+// Set when a command authenticates with the browser sign-in rather than an API key.
+let usingSignIn = false;
+
 const handleError = async (error, options) => {
   const details = await buildErrorDetails(error);
+  // Disconnecting the CLI in the web app rejects its token at once, before it expires.
+  if (usingSignIn && details.status === 401) {
+    details.message =
+      "Your ActivitySmith sign-in was disconnected or expired. Run activitysmith auth login to sign in again.";
+  }
 
   if (options?.json) {
     console.log(JSON.stringify({ error: details }, null, 2));
@@ -1236,11 +1249,15 @@ const handleError = async (error, options) => {
   process.exit(1);
 };
 
-const requireApiKey = (options) => {
-  const apiKey = getApiKey(options);
+// Returns the API key, or a current access token from the saved sign-in. The REST API accepts
+// either as a Bearer token.
+const requireApiKey = async (options) => {
+  const configuredKey = options.apiKey || process.env.ACTIVITYSMITH_API_KEY;
+  const apiKey = configuredKey || (await getAccessToken());
+  usingSignIn = !configuredKey && Boolean(apiKey);
   if (!apiKey) {
     throw new Error(
-      "Missing API key. Provide --api-key or set ACTIVITYSMITH_API_KEY."
+      "Missing API key. Run activitysmith auth login, provide --api-key, or set ACTIVITYSMITH_API_KEY."
     );
   }
   return apiKey;
@@ -1296,7 +1313,7 @@ program
     const globalOptions = program.opts();
 
     try {
-      const apiKey = requireApiKey(globalOptions);
+      const apiKey = await requireApiKey(globalOptions);
       const client = createClient(apiKey);
       const actions = await loadPushActions(options);
       validatePushMediaOptions({
@@ -1381,7 +1398,7 @@ program
     const globalOptions = program.opts();
 
     try {
-      const apiKey = requireApiKey(globalOptions);
+      const apiKey = await requireApiKey(globalOptions);
       const client = createClient(apiKey);
       const response = await client.badgeCount(
         value,
@@ -1418,7 +1435,7 @@ metricsCommand
     const globalOptions = program.opts();
 
     try {
-      const apiKey = requireApiKey(globalOptions);
+      const apiKey = await requireApiKey(globalOptions);
       const client = createClient(apiKey);
       const value = parseMetricValueArgument(rawValue);
       const response = await client.metrics.update(metricKey, value);
@@ -1462,7 +1479,7 @@ addLiveActivityActionOptions(addContentStateOptions(
         if (options.clearTags && options.tags !== undefined) {
           throw new Error("Use either --tags or --clear-tags, not both.");
         }
-        const apiKey = requireApiKey(globalOptions);
+        const apiKey = await requireApiKey(globalOptions);
         const client = createClient(apiKey);
         const contentState = await loadContentState(options, "stream");
         const action = await loadLiveActivityAction(options);
@@ -1518,7 +1535,7 @@ addLiveActivityActionOptions(addContentStateOptions(
       const globalOptions = program.opts();
 
       try {
-        const apiKey = requireApiKey(globalOptions);
+        const apiKey = await requireApiKey(globalOptions);
         const client = createClient(apiKey);
         const contentState = await loadContentState(options, "start");
         const action = await loadLiveActivityAction(options);
@@ -1566,7 +1583,7 @@ addLiveActivityActionOptions(addContentStateOptions(
         if (options.clearTags && options.tags !== undefined) {
           throw new Error("Use either --tags or --clear-tags, not both.");
         }
-        const apiKey = requireApiKey(globalOptions);
+        const apiKey = await requireApiKey(globalOptions);
         const client = createClient(apiKey);
         const contentState = await loadContentState(options, "update");
         const action = await loadLiveActivityAction(options);
@@ -1607,7 +1624,7 @@ addLiveActivityActionOptions(addContentStateOptions(
         if (options.clearTags && options.tags !== undefined) {
           throw new Error("Use either --tags or --clear-tags, not both.");
         }
-        const apiKey = requireApiKey(globalOptions);
+        const apiKey = await requireApiKey(globalOptions);
         const client = createClient(apiKey);
         const contentState = await loadContentState(options, "end");
         const action = await loadLiveActivityAction(options);
@@ -1649,7 +1666,7 @@ addLiveActivityActionOptions(addContentStateOptions(
         if (options.clearTags && options.tags !== undefined) throw new Error("Provide either --tags or --clear-tags, not both.");
         const tags = options.clearTags ? [] : options.tags;
         const metadata = await loadMetadata(options);
-        const apiKey = requireApiKey(globalOptions);
+        const apiKey = await requireApiKey(globalOptions);
         const client = createClient(apiKey);
         const contentState = await loadOptionalContentState(options, "end");
         const action = await loadLiveActivityAction(options);
@@ -1684,6 +1701,89 @@ addLiveActivityActionOptions(addContentStateOptions(
     }),
   { includeAutoDismiss: true, includeAutoDismissSeconds: true }
 ));
+
+const authCommand = program
+  .command("auth")
+  .description("Sign in through the browser and manage the saved sign-in");
+
+authCommand
+  .command("login")
+  .description("Sign in through the browser so commands work without an API key")
+  .option("--no-browser", "Print the sign-in URL instead of opening a browser")
+  .action(async (options) => {
+    const globalOptions = program.opts();
+
+    try {
+      await login({ noBrowser: options.browser === false });
+      outputResult(
+        { signed_in: true, credentials_path: credentialsPath() },
+        globalOptions,
+        [
+          "Signed in to ActivitySmith.",
+          `Saved to: ${credentialsPath()}`,
+          process.env.ACTIVITYSMITH_API_KEY
+            ? "Note: ACTIVITYSMITH_API_KEY is set and takes precedence over the sign-in."
+            : null,
+        ]
+      );
+    } catch (error) {
+      await handleError(error, globalOptions);
+    }
+  });
+
+authCommand
+  .command("logout")
+  .description("Sign out and disconnect the CLI from your account")
+  .action(async () => {
+    const globalOptions = program.opts();
+
+    try {
+      const result = await logout();
+      const lines = !result.signedIn
+        ? ["Not signed in."]
+        : result.revoked
+          ? ["Signed out. The CLI is disconnected from your ActivitySmith account."]
+          : [
+              "Signed out on this machine.",
+              'If "ActivitySmith CLI" is still listed under AI Agents at https://activitysmith.com/app/ai-agents, select Disconnect there.',
+            ];
+      outputResult({ signed_out: result.signedIn, disconnected: result.revoked }, globalOptions, lines);
+    } catch (error) {
+      await handleError(error, globalOptions);
+    }
+  });
+
+authCommand
+  .command("status")
+  .description("Show how the CLI authenticates, without printing secrets")
+  .action(async () => {
+    const globalOptions = program.opts();
+
+    try {
+      const source = credentialSource(globalOptions);
+      const stored = readCredentials();
+      const payload = {
+        signed_in: Boolean(stored),
+        auth_source: source,
+        signed_in_at: stored?.signed_in_at ?? null,
+        credentials_path: credentialsPath(),
+      };
+      const sourceLine =
+        source === "auth login"
+          ? "Using the browser sign-in from activitysmith auth login."
+          : source
+            ? `Using the API key from ${source}.`
+            : "Not signed in. Run activitysmith auth login.";
+      outputResult(payload, globalOptions, [
+        sourceLine,
+        stored && source !== "auth login" ? "A browser sign-in is also saved, but the API key takes precedence." : null,
+        stored ? `Signed in: ${stored.signed_in_at}` : null,
+        stored ? `Saved to: ${credentialsPath()}` : null,
+      ]);
+    } catch (error) {
+      await handleError(error, globalOptions);
+    }
+  });
 
 program.showHelpAfterError(true);
 program.parseAsync(process.argv);
