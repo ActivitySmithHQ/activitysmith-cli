@@ -485,3 +485,22 @@ test("keys create uses the browser sign-in and can print only the key", async ()
   assert.match(shown.stdout, /Key: ask_secret/);
   assert.match(shown.stdout, /only time the key is shown/);
 });
+
+test("metrics update sends only the value", async () => {
+  const result = await runCli(["metrics", "update", "mrr", "42.5"]);
+
+  assert.equal(result.code, 0, result.stdout + result.stderr);
+  assert.equal(result.request.method, "POST");
+  assert.match(result.request.url, /\/metrics\/mrr\/value$/);
+  assert.deepEqual(result.request.body, { value: 42.5 });
+});
+
+test("metrics update rejects Metadata options before sending", async () => {
+  for (const extra of [["--metadata", "{}"], ["--metadata-file", "metadata.json"]]) {
+    const result = await runCli(["metrics", "update", "mrr", "42", ...extra]);
+
+    assert.notEqual(result.code, 0);
+    assert.match(result.stdout + result.stderr, /unknown option/);
+    assert.equal(result.request, null);
+  }
+});
