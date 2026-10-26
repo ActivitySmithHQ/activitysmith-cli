@@ -1439,9 +1439,7 @@ metricsCommand
   .description("Update a widget metric value")
   .argument("<metric-key>", "Metric key")
   .argument("<value>", "Metric value")
-  .option("--metadata <json>", "Metadata JSON object shown in ActivitySmith details")
-    .option("--metadata-file <path>", "Path to a Metadata JSON object file")
-    .action(async (metricKey, rawValue) => {
+  .action(async (metricKey, rawValue) => {
     const globalOptions = program.opts();
 
     try {
