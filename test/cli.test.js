@@ -389,3 +389,35 @@ test("push --replace rejects options that only apply to new sends", async () => 
     assert.equal(result.request, null);
   }
 });
+
+test("metrics create sends the metric definition", async () => {
+  const result = await runCli([
+    "metrics",
+    "create",
+    "mrr",
+    "--label",
+    "MRR",
+    "--format",
+    "currency",
+    "--currency-code",
+    "USD",
+  ]);
+
+  assert.equal(result.code, 0, result.stderr);
+  assert.equal(result.request.method, "PUT");
+  assert.equal(result.request.url, "https://activitysmith.com/api/metrics/mrr");
+  assert.deepEqual(result.request.body, {
+    label: "MRR",
+    format: "currency",
+    currency_code: "USD",
+  });
+});
+
+test("metrics create without options uses the API defaults", async () => {
+  const result = await runCli(["metrics", "create", "deploy.success_rate"]);
+
+  assert.equal(result.code, 0, result.stderr);
+  assert.equal(result.request.method, "PUT");
+  assert.equal(result.request.url, "https://activitysmith.com/api/metrics/deploy.success_rate");
+  assert.equal(result.request.body, null);
+});

@@ -1422,7 +1422,42 @@ program
 const metricsCommand = program
   .command("metrics")
   .alias("metric")
-  .description("Update widget metric values");
+  .description("Create widget metrics and update their values");
+
+metricsCommand
+  .command("create")
+  .description("Create a widget metric, or update the fields you pass for an existing one")
+  .argument("<metric-key>", "Metric key")
+  .option("--label <label>", "Name shown on the widget (defaults to a label made from the key)")
+  .option("--format <format>", "number, currency, percent, unit, or string (defaults to number)")
+  .option("--currency-code <code>", "3-letter ISO currency code, required for the currency format")
+  .option("--unit <unit>", "Unit suffix for the unit format, such as ms or GB")
+  .option("--unit-spacing <spacing>", "For the unit format: none (120ms) or space (120 ms)")
+  .action(async (metricKey, options) => {
+    const globalOptions = program.opts();
+
+    try {
+      const apiKey = await requireApiKey(globalOptions);
+      const client = createClient(apiKey);
+      const definition = Object.fromEntries(
+        Object.entries({
+          label: options.label,
+          format: options.format,
+          currency_code: options.currencyCode,
+          unit: options.unit,
+          unit_spacing: options.unitSpacing,
+        }).filter(([, value]) => value !== undefined)
+      );
+      const response = await client.metrics.create(
+        metricKey,
+        Object.keys(definition).length > 0 ? definition : undefined
+      );
+
+      outputResult(response, globalOptions, ["Metric saved."]);
+    } catch (error) {
+      await handleError(error, globalOptions);
+    }
+  });
 
 metricsCommand
   .command("update")
