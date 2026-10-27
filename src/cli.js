@@ -1221,7 +1221,7 @@ const buildErrorDetails = async (error) => {
 // Set when a command authenticates with the browser sign-in rather than an API key.
 let usingSignIn = false;
 
-const handleError = async (error, options) => {
+const handleError = async (error, options, exitCode = 1) => {
   const details = await buildErrorDetails(error);
   // Disconnecting the CLI in the web app rejects its token at once, before it expires.
   if (usingSignIn && details.status === 401) {
@@ -1256,7 +1256,7 @@ const handleError = async (error, options) => {
     }
   }
 
-  process.exit(1);
+  process.exit(exitCode);
 };
 
 // Returns the API key, or a current access token from the saved sign-in. The REST API accepts
@@ -1832,6 +1832,223 @@ keysCommand
       ]);
     } catch (error) {
       await handleError(error, globalOptions);
+    }
+  });
+
+// Approvals. Agents ask the user for approval before an action the user wants to approve, such as
+// sending an email or deploying, and go ahead only when this exits 0.
+const APPROVAL_SCOPE_TYPES = ["working_directory", "repository", "project", "environment", "customer", "account", "resource"];
+const APPROVAL_COLORS = ["lime", "green", "cyan", "blue", "purple", "magenta", "red", "orange", "yellow", "gray"];
+// Each request waits at most this long on the server, then the CLI asks again.
+const APPROVAL_POLL_SECONDS = 45;
+const APPROVAL_EXIT = { approved: 0, not_approved: 1, error: 2, pending: 3 };
+
+const parseApprovalScope = (value) => {
+  const separator = value.indexOf(":");
+  const type = separator > 0 ? value.slice(0, separator).trim() : "";
+  const scopeValue = separator > 0 ? value.slice(separator + 1).trim() : "";
+  if (!APPROVAL_SCOPE_TYPES.includes(type) || !scopeValue) {
+    throw new InvalidArgumentError(
+      `scope must be <type>:<value>, where type is one of ${APPROVAL_SCOPE_TYPES.join(", ")}`
+    );
+  }
+  return { type, value: scopeValue };
+};
+
+const parseApprovalColor = (value) => {
+  if (!APPROVAL_COLORS.includes(value)) {
+    throw new InvalidArgumentError(`color must be one of ${APPROVAL_COLORS.join(", ")}`);
+  }
+  return value;
+};
+
+const parsePositiveSeconds = (value) => {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    throw new InvalidArgumentError("timeout must be a whole number of seconds, 1 or more");
+  }
+  return parsed;
+};
+
+const APPROVAL_RESULT_LINES = {
+  approved: "Approved.",
+  rejected: "Rejected. Do not continue with the action.",
+  timed_out: "Timed out. No decision within 30 minutes. Do not continue with the action.",
+  cancelled: "Cancelled. Do not continue with the action.",
+};
+
+// Waits until the approval is decided, or until `timeoutSeconds` pass, then prints the result and exits.
+const waitForApproval = async (approvalId, token, timeoutSeconds, globalOptions) => {
+  const deadline = timeoutSeconds ? Date.now() + timeoutSeconds * 1000 : Number.POSITIVE_INFINITY;
+  let result;
+  while (true) {
+    const remaining = Math.ceil((deadline - Date.now()) / 1000);
+    const wait = Math.max(1, Math.min(APPROVAL_POLL_SECONDS, remaining));
+    const startedAt = Date.now();
+    result = await apiRequest(`/approvals/${encodeURIComponent(approvalId)}?wait=${wait}`, { token });
+    if (result.approval?.status !== "pending" || Date.now() >= deadline) break;
+    // The server normally holds the request until it decides or the wait ends; never ask again in a tight loop.
+    await new Promise((resolve) => setTimeout(resolve, Math.max(0, 1000 - (Date.now() - startedAt))));
+  }
+
+  const status = result.approval?.status;
+  if (status === "pending") {
+    outputResult(result, globalOptions, [
+      `Still pending. Approval ID: ${approvalId}`,
+      `Run activitysmith approval wait ${approvalId} to keep waiting.`,
+    ]);
+    process.exit(APPROVAL_EXIT.pending);
+  }
+  outputResult(result, globalOptions, [APPROVAL_RESULT_LINES[status] ?? `Status: ${status}`]);
+  process.exit(status === "approved" ? APPROVAL_EXIT.approved : APPROVAL_EXIT.not_approved);
+};
+
+const approvalCommand = program
+  .command("approval")
+  .description("Let your agents ask for your approval on your iPhone before they act")
+  .addHelpText(
+    "after",
+    `
+Exit codes for request and wait:
+  0  Approved. Continue with the action.
+  1  Rejected, timed out, or cancelled. Do not continue.
+  2  The request failed, for example no paired device.
+  3  Still pending after --timeout or with --no-wait. Run approval wait with the approval ID.`
+  );
+
+approvalCommand
+  .command("request")
+  .description("Send an approval request with two buttons to the iPhone and wait for the decision")
+  .argument("<question>", 'The decision to make, such as "Send the pricing update email to 214 customers?"')
+  .option("--details <text>", "Short context that helps decide")
+  .option("--approve-label <label>", "Approve button title, a concrete verb such as Send or Deploy", "Approve")
+  .option("--reject-label <label>", "Reject button title, such as Cancel or Don't Send", "Reject")
+  .option("--command <command>", "The exact command waiting for approval. Do not shorten or rewrite it")
+  .option("--tool <name>", "Name of the operation waiting for approval (default: shell with --command)")
+  .option(
+    "--scope <type:value>",
+    `Where the action applies, such as environment:production. Types: ${APPROVAL_SCOPE_TYPES.join(", ")} (default: working_directory:<current directory> with --command)`,
+    parseApprovalScope
+  )
+  .addOption(
+    new Option("--delivery <surface>", "Live Activity, Push Notification, or auto: a Live Activity with a Push Notification fallback")
+      .choices(["auto", "live_activity", "push_notification"])
+      .default("auto")
+  )
+  .option("--color <color>", "Live Activity color (default: blue)", parseApprovalColor)
+  .option("--icon <symbol>", "SF Symbol for the Live Activity (default: sparkles)")
+  .option("--badge <title>", "Short Live Activity badge such as Email or Deploy (default: Agent)")
+  .option("--channels <slugs>", "Comma-separated channel slugs. Omit to ask on every paired device")
+  .option("--timeout <seconds>", "Stop waiting after this many seconds and exit 3 if still pending", parsePositiveSeconds)
+  .option("--no-wait", "Send the request, print the approval ID, and exit without waiting")
+  .action(async (question, options) => {
+    const globalOptions = program.opts();
+
+    try {
+      const token = await requireApiKey(globalOptions);
+      const tool = options.tool ?? (options.command ? "shell" : undefined);
+      if (options.command && !tool) throw new Error("Provide --tool with --command.");
+      const scope = options.scope ?? (options.command ? { type: "working_directory", value: process.cwd() } : undefined);
+      const appearance = {
+        ...(options.color ? { color: options.color } : {}),
+        ...(options.icon ? { icon: { symbol: options.icon } } : {}),
+        ...(options.badge ? { badge: { title: options.badge } } : {}),
+      };
+      const channels = String(options.channels ?? "")
+        .split(",")
+        .map((slug) => slug.trim())
+        .filter(Boolean);
+
+      const result = await apiRequest("/approvals", {
+        token,
+        method: "POST",
+        body: {
+          question,
+          ...(options.details ? { details: options.details } : {}),
+          ...(tool ? { execution_context: { tool, ...(options.command ? { command: options.command } : {}) } } : {}),
+          ...(scope ? { scope } : {}),
+          delivery: options.delivery,
+          approve_label: options.approveLabel,
+          reject_label: options.rejectLabel,
+          ...(Object.keys(appearance).length > 0 ? { appearance } : {}),
+          ...(channels.length > 0 ? { target_channel_slugs: channels } : {}),
+        },
+      });
+      const approvalId = result.approval?.id;
+      if (!approvalId) throw new Error("The API did not return an approval ID. Run the command again.");
+
+      if (options.wait === false) {
+        outputResult(result, globalOptions, [
+          `Approval requested. Approval ID: ${approvalId}`,
+          `Run activitysmith approval wait ${approvalId} to wait for the decision.`,
+        ]);
+        process.exit(APPROVAL_EXIT.pending);
+      }
+      if (!globalOptions.json) {
+        console.error(`Approval requested. Waiting for the decision on the iPhone. Approval ID: ${approvalId}`);
+      }
+      await waitForApproval(approvalId, token, options.timeout, globalOptions);
+    } catch (error) {
+      await handleError(error, globalOptions, APPROVAL_EXIT.error);
+    }
+  });
+
+approvalCommand
+  .command("wait")
+  .description("Wait for the decision on an approval request")
+  .argument("<approval-id>", "Approval ID from approval request")
+  .option("--timeout <seconds>", "Stop waiting after this many seconds and exit 3 if still pending", parsePositiveSeconds)
+  .action(async (approvalId, options) => {
+    const globalOptions = program.opts();
+
+    try {
+      const token = await requireApiKey(globalOptions);
+      await waitForApproval(approvalId, token, options.timeout, globalOptions);
+    } catch (error) {
+      await handleError(error, globalOptions, APPROVAL_EXIT.error);
+    }
+  });
+
+approvalCommand
+  .command("get")
+  .description("Show the current state of an approval request without waiting")
+  .argument("<approval-id>", "Approval ID from approval request")
+  .action(async (approvalId) => {
+    const globalOptions = program.opts();
+
+    try {
+      const token = await requireApiKey(globalOptions);
+      const result = await apiRequest(`/approvals/${encodeURIComponent(approvalId)}`, { token });
+      const status = result.approval?.status;
+      outputResult(result, globalOptions, [
+        status === "pending" ? "Pending." : (APPROVAL_RESULT_LINES[status] ?? `Status: ${status}`),
+        `Approval ID: ${approvalId}`,
+        result.approval?.question ? `Question: ${result.approval.question}` : null,
+      ]);
+    } catch (error) {
+      await handleError(error, globalOptions, APPROVAL_EXIT.error);
+    }
+  });
+
+approvalCommand
+  .command("cancel")
+  .description("Withdraw a pending approval request that is no longer needed")
+  .argument("<approval-id>", "Approval ID from approval request")
+  .action(async (approvalId) => {
+    const globalOptions = program.opts();
+
+    try {
+      const token = await requireApiKey(globalOptions);
+      const result = await apiRequest(`/approvals/${encodeURIComponent(approvalId)}/cancel`, { token, method: "POST" });
+      const status = result.approval?.status;
+      outputResult(result, globalOptions, [
+        status === "cancelled"
+          ? "Approval request cancelled. It can no longer be approved."
+          : `Not cancelled: the request is already ${String(status).replace("_", " ")}.`,
+        `Approval ID: ${approvalId}`,
+      ]);
+    } catch (error) {
+      await handleError(error, globalOptions, APPROVAL_EXIT.error);
     }
   });
 

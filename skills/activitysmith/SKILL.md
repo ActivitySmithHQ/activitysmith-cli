@@ -1,6 +1,6 @@
 ---
 name: activitysmith
-description: Send ActivitySmith Push Notifications, start, update, and end Live Activities, set App Icon Badge Counts, and include notification taps or actions that run a specific iPhone Shortcut from coding agents through the ActivitySmith CLI.
+description: Send ActivitySmith Push Notifications, start, update, and end Live Activities, ask for approval on the user's iPhone before an action, set App Icon Badge Counts, and include notification taps or actions that run a specific iPhone Shortcut from coding agents through the ActivitySmith CLI.
 ---
 
 # ActivitySmith
@@ -14,6 +14,8 @@ Use this skill when the user wants an iPhone/iPad signal from an agent:
 - "keep a metric, status, or progress visible while you work"
 - "show this metric on my Lock Screen"
 - "tell me if you get blocked"
+- "ask me before you send emails to customers"
+- "get my approval before any purchase or deploy"
 
 The CLI is the tool. This skill is the intent mapping and recipe layer.
 
@@ -49,6 +51,7 @@ If it prints `No paired devices.`, give the user the App Store link it prints. A
 - Push Notification with actions: long-press should show up to 4 buttons.
 - Live Activity: a real-time metric, operational state, or ongoing task should stay visible.
 - Widget metric: one stable value should stay visible after the task ends.
+- Approval: the user asked to approve a kind of action before you do it.
 - Channels: only specific teammates/devices should receive the update.
 - Tags: related Push Notifications and Live Activities should be grouped in history.
 
@@ -188,6 +191,24 @@ Use this when the agent needs human input.
   -m "I hit a blocker and need your decision."
 ```
 
+### Ask For Approval Before An Action
+
+Use this when the user set a rule, such as "ask me before you send emails to customers" or "get my approval before any purchase". The rule applies every time. Ask right before each matching action:
+
+```bash
+activitysmith approval request "Send the pricing update email to 214 customers?" \
+  --approve-label "Send" \
+  --reject-label "Don't Send" \
+  --timeout 100
+```
+
+- Exit `0` (`Approved.`): do the action.
+- Exit `1` (rejected, timed out, or cancelled): do not do the action. Tell the user.
+- Exit `3` (`Still pending`): run `activitysmith approval wait <approval-id> --timeout 100`. Repeat until it exits `0` or `1`.
+- Exit `2`: the request failed. Report the error and do not do the action.
+
+Write a question the user can answer from the Lock Screen. Use a concrete approve label, such as Send, Deploy, or Buy. For a shell command, pass the exact command with `--command`. If the action is no longer needed, run `activitysmith approval cancel <approval-id>`.
+
 ### Update A Widget Metric
 
 Use this when a stable metric should stay visible on the Lock Screen.
@@ -247,5 +268,6 @@ activitysmith badge 3 --channels "sales,customer-success"
 - For long-running progress, start one Live Activity, update it, then end it.
 - Add tags when the user wants related Push Notifications and Live Activities grouped in history.
 - Capture the Activity ID when using start/update/end.
+- Never do an action the user asked to approve without an `Approved.` result. One approval covers one action.
 - Do not expose API keys, tokens, or secrets in titles, messages, action URLs, or webhook bodies.
 - If a command fails, report the error and do not retry repeatedly without a change.
