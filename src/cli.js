@@ -2,7 +2,17 @@
 
 import { Command, InvalidArgumentError, Option } from "commander";
 import { loadMetadata } from "./metadata.js";
-import { credentialsPath, getAccessToken, login, logout, readCredentials } from "./auth.js";
+import {
+  API_KEYS_SCOPE,
+  DEFAULT_API_RESOURCE,
+  LOGIN_SCOPES,
+  credentialsPath,
+  getAccessToken,
+  hasScope,
+  login,
+  logout,
+  readCredentials,
+} from "./auth.js";
 import ActivitySmith from "activitysmith";
 import { createRequire } from "module";
 import { readFile } from "fs/promises";
@@ -1701,6 +1711,131 @@ addLiveActivityActionOptions(addContentStateOptions(
     }),
   { includeAutoDismiss: true, includeAutoDismissSeconds: true }
 ));
+
+const APP_STORE_URL = "https://apps.apple.com/us/app/activitysmith/id6752254835";
+
+// Account endpoints the generated SDK does not cover. Same API and SDK header as the SDK client, so
+// errors print the same way and usage shows the CLI version.
+const apiRequest = async (path, { token, method = "GET", body } = {}) => {
+  const response = await fetch(`${DEFAULT_API_RESOURCE}${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+      "X-ActivitySmith-SDK": `cli-v${version}`,
+      ...(body ? { "Content-Type": "application/json" } : {}),
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  if (!response.ok) {
+    const error = new Error(`Request failed with status ${response.status}`);
+    error.response = response;
+    throw error;
+  }
+  return response.json();
+};
+
+const describeDevice = (device) => {
+  const name = device.device_name || device.device_type || "Device";
+  const system = [device.system_name, device.system_version].filter(Boolean).join(" ");
+  const details = [system, device.is_active ? "active" : "inactive", device.user_email].filter(Boolean);
+  return `- ${name} (${details.join(", ")}) ID: ${device.device_id}`;
+};
+
+const devicesCommand = program
+  .command("devices")
+  .description("List the iPhones and iPads paired to your account");
+
+devicesCommand
+  .command("list", { isDefault: true })
+  .description("List paired devices, active ones first")
+  .option("--include-inactive", "Also list devices that can no longer receive deliveries")
+  .action(async (options) => {
+    const globalOptions = program.opts();
+
+    try {
+      const token = await requireApiKey(globalOptions);
+      const query = options.includeInactive ? "?include_inactive=true" : "";
+      const result = await apiRequest(`/account/devices${query}`, { token });
+      const devices = Array.isArray(result.devices) ? result.devices : [];
+      const active = devices.filter((device) => device.is_active).length;
+      outputResult(
+        result,
+        globalOptions,
+        devices.length === 0
+          ? [
+              "No paired devices.",
+              "Install ActivitySmith from the App Store, sign in with this account, and allow notifications:",
+              APP_STORE_URL,
+            ]
+          : [
+              `${devices.length} ${devices.length === 1 ? "device" : "devices"}, ${active} active:`,
+              ...devices.map(describeDevice),
+              result.meta?.has_more ? "More devices exist. Use --json to see the meta.next_offset value." : null,
+            ]
+      );
+    } catch (error) {
+      await handleError(error, globalOptions);
+    }
+  });
+
+const keysCommand = program
+  .command("keys")
+  .description("Create API keys for CI, servers, and scripts");
+
+keysCommand
+  .command("create")
+  .description(
+    "Create an API key with the browser sign-in. The first time, approve API key access in the browser"
+  )
+  .requiredOption("--name <name>", 'Key name, such as "GitHub Actions"')
+  .option("--channels <slugs>", "Comma-separated channel slugs. The key reaches only these Channels")
+  .option("--raw", "Print only the key on standard output, for piping it into a secret store")
+  .action(async (options) => {
+    const globalOptions = program.opts();
+
+    try {
+      // API keys cannot create keys, so this always uses the browser sign-in, even when an API key is set.
+      let stored = null;
+      try {
+        stored = readCredentials();
+      } catch {
+        // An unreadable sign-in is replaced by the login below.
+      }
+      if (!hasScope(stored, API_KEYS_SCOPE)) {
+        console.error("Approve API key access in the browser so the CLI can create API keys.");
+        await login({ scope: `${LOGIN_SCOPES} ${API_KEYS_SCOPE}` });
+      }
+      const token = await getAccessToken();
+      usingSignIn = true;
+      const channels = String(options.channels ?? "")
+        .split(",")
+        .map((slug) => slug.trim())
+        .filter(Boolean);
+      const result = await apiRequest("/account/api-keys", {
+        token,
+        method: "POST",
+        body: { name: options.name, ...(channels.length > 0 ? { channels } : {}) },
+      });
+      const key = result.api_key?.key;
+      if (!key) {
+        throw new Error("The API did not return a key. Run the command again.");
+      }
+
+      if (options.raw) {
+        process.stdout.write(`${key}\n`);
+        console.error(`Created API key "${result.api_key.name}". Store it as a secret and never commit it.`);
+        return;
+      }
+      outputResult(result, globalOptions, [
+        `Created API key "${result.api_key.name}".`,
+        `Key: ${key}`,
+        "This is the only time the key is shown. Store it as a secret named ACTIVITYSMITH_API_KEY and never commit it.",
+      ]);
+    } catch (error) {
+      await handleError(error, globalOptions);
+    }
+  });
 
 const authCommand = program
   .command("auth")

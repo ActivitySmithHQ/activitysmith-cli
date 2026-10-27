@@ -25,10 +25,13 @@ For example, a Codex agent can work on your computer, send a Push Notification w
 ## Quickstart
 
 1. Run `activitysmith auth login` and approve access in your browser.
-2. Run `activitysmith --help` to inspect available commands.
+2. Run `activitysmith devices list` to check that your iPhone is paired.
+3. Run `activitysmith --help` to inspect available commands.
 
 ```bash
 activitysmith auth login
+
+activitysmith devices list
 
 activitysmith push --title "Hello"
 ```
@@ -84,6 +87,44 @@ Or pass the key directly:
 
 ```bash
 activitysmith --api-key "YOUR-API-KEY" push --title "Hello"
+```
+
+### Create an API key from the CLI
+
+Create an API key for CI, servers, and scripts without opening the web app. The command uses the browser sign-in. The first time, it opens your browser so you can approve API key access.
+
+```bash
+activitysmith keys create --name "GitHub Actions"
+```
+
+The key is shown only once. Add `--raw` to print only the key, then pipe it straight into a secret store. The key never appears in your terminal:
+
+```bash
+activitysmith keys create --name "GitHub Actions" --raw | gh secret set ACTIVITYSMITH_API_KEY
+```
+
+Add `--channels` to limit the key to some Channels:
+
+```bash
+activitysmith keys create --name "Ops alerts" --channels ops,alerts
+```
+
+An API key cannot create another key. This command always uses the browser sign-in, even when `ACTIVITYSMITH_API_KEY` is set.
+
+## Paired Devices
+
+List the iPhones and iPads paired to your account. Active devices come first:
+
+```bash
+activitysmith devices list
+```
+
+If no device is paired, the command prints the App Store link. Install ActivitySmith on your iPhone, sign in with the same account, and allow notifications.
+
+Add `--include-inactive` to also list devices that can no longer receive deliveries:
+
+```bash
+activitysmith devices list --include-inactive
 ```
 
 ## Push Notifications

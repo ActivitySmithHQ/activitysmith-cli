@@ -16,6 +16,10 @@ export const CLIENT_NAME = "ActivitySmith CLI";
 export const CLIENT_ID = "https://activitysmith.com/.well-known/oauth-client/activitysmith-cli.json";
 // Sending Push Notifications, Live Activities, badges, and widget values. Nothing else.
 export const LOGIN_SCOPES = "mcp:write";
+// Asked for only by `activitysmith keys create`, which signs in again so the user approves it in the browser.
+export const API_KEYS_SCOPE = "api_keys:write";
+
+export const hasScope = (credentials, scope) => String(credentials?.scope ?? "").split(/\s+/).includes(scope);
 const LOGIN_TIMEOUT_MS = 5 * 60 * 1000;
 // Refresh a little early so a token does not expire mid-request.
 const ACCESS_TOKEN_REFRESH_MARGIN_MS = 60 * 1000;
@@ -95,13 +99,13 @@ export const discoverOAuthServer = async ({ issuer, fetchImpl }) => {
   return metadata;
 };
 
-export const buildAuthorizeUrl = ({ authorizationEndpoint, redirectUri, challenge, state, resource }) => {
+export const buildAuthorizeUrl = ({ authorizationEndpoint, redirectUri, challenge, state, resource, scope = LOGIN_SCOPES }) => {
   const url = new URL(authorizationEndpoint);
   url.search = new URLSearchParams({
     response_type: "code",
     client_id: CLIENT_ID,
     redirect_uri: redirectUri,
-    scope: LOGIN_SCOPES,
+    scope,
     state,
     code_challenge: challenge,
     code_challenge_method: "S256",
@@ -255,6 +259,7 @@ export const login = async ({
   log = (line) => console.error(line),
   now = Date.now,
   timeoutMs = LOGIN_TIMEOUT_MS,
+  scope = LOGIN_SCOPES,
 } = {}) => {
   let previous = null;
   try {
@@ -275,6 +280,7 @@ export const login = async ({
       challenge,
       state,
       resource,
+      scope,
     });
     const opened = noBrowser ? false : await launchBrowser(authorizeUrl);
     log(opened ? "Opened your browser to sign in to ActivitySmith." : "Open this URL in a browser to sign in to ActivitySmith:");

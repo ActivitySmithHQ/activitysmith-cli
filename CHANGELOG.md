@@ -1,3 +1,7 @@
+## 1.16.0
+
+Adds two commands so a coding agent can finish setup on its own. `activitysmith devices list` shows the iPhones and iPads paired to your account, and points to the App Store when none is paired. `activitysmith keys create` creates an API key for CI, servers, and scripts with the browser sign-in; the first time, it asks you to approve API key access in the browser. Add `--raw` to print only the key, so it can go straight into a secret store.
+
 ## 1.15.0
 
 Adds browser sign-in. Run `activitysmith auth login`, approve access in your browser, and commands work without an API key. `activitysmith auth status` shows how the CLI authenticates, and `activitysmith auth logout` disconnects it from your account. `--api-key` and `ACTIVITYSMITH_API_KEY` still work and take precedence, so CI pipelines can keep using API keys.
