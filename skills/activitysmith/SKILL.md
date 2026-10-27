@@ -33,6 +33,14 @@ activitysmith auth login
 
 It opens the user's browser and waits until they approve, then saves the sign-in for this machine. If no browser can open, it prints a URL for the user to visit. Never ask the user to paste an API key into chat.
 
+Before the first send, check that a device is paired:
+
+```bash
+activitysmith devices list
+```
+
+If it prints `No paired devices.`, give the user the App Store link it prints. Ask them to sign in to the app with the same account and allow notifications, then run `devices list` again.
+
 ## Pick The Right Signal
 
 - Push Notification: one important event, completion, blocker, review request, or handoff.
@@ -193,6 +201,16 @@ String values work too:
 ```bash
 activitysmith metrics update prod.status healthy
 ```
+
+### Store An API Key For CI
+
+Use this when code that runs elsewhere, like a CI job, server, or cron job, should send Push Notifications or Live Activities. Pipe the key straight into the secret store so it never appears in chat or terminal output:
+
+```bash
+activitysmith keys create --name "GitHub Actions" --raw | gh secret set ACTIVITYSMITH_API_KEY
+```
+
+The first `keys create` opens the browser once. Ask the user to approve API key access. Name the secret `ACTIVITYSMITH_API_KEY`, and tell the user where you stored it. Never print or commit the key.
 
 ## Tags
 
