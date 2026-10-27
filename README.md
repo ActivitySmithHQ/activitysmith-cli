@@ -692,6 +692,73 @@ Pass `0` to clear the badge.
 activitysmith badge 0
 ```
 
+## Approvals
+
+![Approval Live Activity on an iPhone Lock Screen with Send and Deny buttons](https://cdn.activitysmith.com/features/ai-agent-approval-live-activity-phone.png)
+
+Let your agents ask for your approval before they act, such as sending an email to customers or deploying to production. The request reaches your iPhone as a Live Activity or an actionable Push Notification, both with two buttons. The agent waits until you tap one and continues only when you approve.
+
+```bash
+activitysmith approval request "Send the pricing update email to 214 customers?" \
+  --approve-label "Send" \
+  --reject-label "Don't Send"
+```
+
+When you approve, the command prints `Approved.` and exits with code `0`. The agent, or a script, runs the action only after that:
+
+```bash
+activitysmith approval request "Deploy to production?" --approve-label "Deploy" && ./deploy.sh
+```
+
+Exit codes for `approval request` and `approval wait`:
+
+- `0`: Approved. Continue with the action.
+- `1`: Rejected, timed out after 30 minutes, or cancelled. Do not continue.
+- `2`: The request failed, for example because no device is paired.
+- `3`: Still pending after `--timeout`, or sent with `--no-wait`.
+
+### Show the exact command
+
+Add `--command` with the exact command that waits for approval. The request shows the command and the current directory:
+
+```bash
+activitysmith approval request "Run the database migration?" \
+  --approve-label "Migrate" \
+  --command "npm run db:migrate -- --env production"
+```
+
+Add `--details` for short context. Add `--scope` to show where the action applies, such as `environment:production`.
+
+### Wait in steps
+
+Some agents stop shell commands after a few minutes. Add `--timeout` to stop waiting early. The command then prints the approval ID and exits with code `3`. Run `approval wait` to keep waiting:
+
+```bash
+activitysmith approval request "Publish the release notes?" --timeout 100
+activitysmith approval wait apr_Xk3pQ8mV2nR7tL9w --timeout 100
+```
+
+### Check or cancel a request
+
+```bash
+activitysmith approval get apr_Xk3pQ8mV2nR7tL9w
+activitysmith approval cancel apr_Xk3pQ8mV2nR7tL9w
+```
+
+Cancel a request when the action is no longer needed. Its buttons stop working, and a Live Activity updates to show the request was cancelled.
+
+### Change how the request looks
+
+By default, the request is a Live Activity, with an actionable Push Notification as the fallback. Add `--delivery push_notification` to always send a Push Notification, or `--delivery live_activity` to always send a Live Activity. Use `--badge`, `--color`, and `--icon` to change the Live Activity:
+
+```bash
+activitysmith approval request "Refund order #4821 for $129?" \
+  --approve-label "Refund" \
+  --badge "Billing" \
+  --color orange \
+  --icon creditcard
+```
+
 ## Metadata
 
 Metadata adds extra information to Push Notification and Live Activity details in ActivitySmith. It does not appear in the notification or Live Activity on your device.

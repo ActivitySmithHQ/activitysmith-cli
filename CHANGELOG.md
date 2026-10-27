@@ -1,3 +1,7 @@
+## 1.17.0
+
+Adds approvals. Your agents can now ask for your approval before they act, such as sending an email or deploying. `activitysmith approval request` shows the request on your iPhone and waits for your answer. It exits with code 0 only when you approve, so the agent continues only after that. `approval wait`, `approval get`, and `approval cancel` work with a request you already sent.
+
 ## 1.16.0
 
 Adds two commands so a coding agent can finish setup on its own. `activitysmith devices list` shows the iPhones and iPads paired to your account, and points to the App Store when none is paired. `activitysmith keys create` creates an API key for CI, servers, and scripts with the browser sign-in; the first time, it asks you to approve API key access in the browser. Add `--raw` to print only the key, so it can go straight into a secret store.

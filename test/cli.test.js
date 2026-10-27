@@ -486,6 +486,96 @@ test("keys create uses the browser sign-in and can print only the key", async ()
   assert.match(shown.stdout, /only time the key is shown/);
 });
 
+const approvalResponse = (status) => ({
+  approval: { id: "apr_1", question: "Send the email?", status, expires_at: "2026-10-27T12:30:00.000Z" },
+  message: "",
+});
+
+test("approval request sends the question and context, then exits 0 when approved", async () => {
+  const result = await runCliWithApi(
+    [
+      "--api-key", "test", "approval", "request", "Send the pricing update email to 214 customers?",
+      "--details", "Draft: pricing-update.md", "--approve-label", "Send", "--reject-label", "Don't Send",
+      "--command", "node scripts/send-pricing-email.js", "--badge", "Email", "--channels", "ops, founders",
+    ],
+    { response: approvalResponse("approved") }
+  );
+  assert.equal(result.code, 0, result.stderr);
+  const [create, wait] = result.requests;
+  assert.equal(create.url, "https://activitysmith.com/api/approvals");
+  assert.equal(create.method, "POST");
+  assert.equal(create.headers.Authorization, "Bearer test");
+  assert.deepEqual(create.body, {
+    question: "Send the pricing update email to 214 customers?",
+    details: "Draft: pricing-update.md",
+    execution_context: { tool: "shell", command: "node scripts/send-pricing-email.js" },
+    scope: { type: "working_directory", value: process.cwd() },
+    delivery: "auto",
+    approve_label: "Send",
+    reject_label: "Don't Send",
+    appearance: { badge: { title: "Email" } },
+    target_channel_slugs: ["ops", "founders"],
+  });
+  assert.equal(wait.url, "https://activitysmith.com/api/approvals/apr_1?wait=45");
+  assert.equal(wait.method, "GET");
+  assert.match(result.stderr, /Waiting for the decision on the iPhone\. Approval ID: apr_1/);
+  assert.equal(result.stdout, "Approved.");
+});
+
+test("approval request exits 1 when the request is rejected, timed out, or cancelled", async () => {
+  for (const [status, line] of [["rejected", /^Rejected\./], ["timed_out", /^Timed out\./], ["cancelled", /^Cancelled\./]]) {
+    const result = await runCliWithApi(["--api-key", "test", "approval", "request", "Deploy?"], { response: approvalResponse(status) });
+    assert.equal(result.code, 1, status);
+    assert.match(result.stdout, line);
+    assert.deepEqual(result.requests[0].body, { question: "Deploy?", delivery: "auto", approve_label: "Approve", reject_label: "Reject" });
+  }
+});
+
+test("approval request exits 3 while still pending after --timeout or with --no-wait", async () => {
+  const timedOut = await runCliWithApi(["--api-key", "test", "approval", "request", "Deploy?", "--timeout", "1"], { response: approvalResponse("pending") });
+  assert.equal(timedOut.code, 3, timedOut.stderr);
+  assert.equal(timedOut.requests[1].url, "https://activitysmith.com/api/approvals/apr_1?wait=1");
+  assert.match(timedOut.stdout, /Still pending\. Approval ID: apr_1/);
+  assert.match(timedOut.stdout, /activitysmith approval wait apr_1/);
+
+  const noWait = await runCliWithApi(["--api-key", "test", "approval", "request", "Deploy?", "--no-wait"], { response: approvalResponse("pending") });
+  assert.equal(noWait.code, 3);
+  assert.equal(noWait.requests.length, 1);
+  assert.match(noWait.stdout, /Approval requested\. Approval ID: apr_1/);
+});
+
+test("approval request validates options before sending", async () => {
+  for (const extra of [["--scope", "planet:mars"], ["--color", "teal"], ["--timeout", "0"], ["--delivery", "email"]]) {
+    const result = await runCliWithApi(["--api-key", "test", "approval", "request", "Deploy?", ...extra], { response: approvalResponse("approved") });
+    assert.notEqual(result.code, 0, extra.join(" "));
+    assert.equal(result.requests.length, 0);
+  }
+  const scoped = await runCliWithApi(
+    ["--api-key", "test", "approval", "request", "Deploy?", "--scope", "environment:production", "--color", "red", "--delivery", "push_notification"],
+    { response: approvalResponse("approved") }
+  );
+  assert.deepEqual(scoped.requests[0].body.scope, { type: "environment", value: "production" });
+  assert.deepEqual(scoped.requests[0].body.appearance, { color: "red" });
+  assert.equal(scoped.requests[0].body.delivery, "push_notification");
+});
+
+test("approval wait, get, and cancel use the approval ID", async () => {
+  const waited = await runCliWithApi(["--api-key", "test", "approval", "wait", "apr_1"], { response: approvalResponse("approved") });
+  assert.equal(waited.code, 0);
+  assert.equal(waited.requests[0].url, "https://activitysmith.com/api/approvals/apr_1?wait=45");
+
+  const got = await runCliWithApi(["--api-key", "test", "approval", "get", "apr_1"], { response: approvalResponse("pending") });
+  assert.equal(got.code, 0);
+  assert.equal(got.requests[0].url, "https://activitysmith.com/api/approvals/apr_1");
+  assert.match(got.stdout, /^Pending\./);
+
+  const cancelled = await runCliWithApi(["--api-key", "test", "approval", "cancel", "apr_1"], { response: approvalResponse("cancelled") });
+  assert.equal(cancelled.code, 0);
+  assert.equal(cancelled.requests[0].url, "https://activitysmith.com/api/approvals/apr_1/cancel");
+  assert.equal(cancelled.requests[0].method, "POST");
+  assert.match(cancelled.stdout, /cancelled\. It can no longer be approved/);
+});
+
 test("metrics update sends only the value", async () => {
   const result = await runCli(["metrics", "update", "mrr", "42.5"]);
 
