@@ -389,3 +389,99 @@ test("push --replace rejects options that only apply to new sends", async () => 
     assert.equal(result.request, null);
   }
 });
+
+// Runs the CLI with a fake API that answers every request with `response` and records the requests.
+const runCliWithApi = (args, { response, env = {} }) =>
+  new Promise((resolve, reject) => {
+    const runner = `
+      globalThis.fetch = async (url, init) => {
+        process.stdout.write("CAPTURE:" + JSON.stringify({
+          url,
+          method: init.method,
+          headers: init.headers,
+          body: init.body ? JSON.parse(init.body) : null
+        }) + "\\n");
+        return new Response(process.env.CLI_TEST_RESPONSE, { status: 200, headers: { "Content-Type": "application/json" } });
+      };
+      process.argv = ["node", "activitysmith", ...JSON.parse(process.env.CLI_TEST_ARGS)];
+      await import("./src/cli.js");
+    `;
+    const child = spawn(process.execPath, ["--input-type=module", "--eval", runner], {
+      cwd: process.cwd(),
+      env: { ...process.env, ...env, CLI_TEST_ARGS: JSON.stringify(args), CLI_TEST_RESPONSE: JSON.stringify(response) },
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk) => { stdout += chunk; });
+    child.stderr.on("data", (chunk) => { stderr += chunk; });
+    child.on("error", reject);
+    child.on("close", (code) => {
+      const lines = stdout.split("\n");
+      const requests = lines.filter((line) => line.startsWith("CAPTURE:")).map((line) => JSON.parse(line.slice("CAPTURE:".length)));
+      const output = lines.filter((line) => line && !line.startsWith("CAPTURE:")).join("\n");
+      resolve({ code, stdout: output, stderr, requests });
+    });
+  });
+
+const signedInConfigDir = async (scope) => {
+  const { mkdtemp, writeFile } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const dir = await mkdtemp(join(tmpdir(), "activitysmith-cli-test-"));
+  await writeFile(join(dir, "credentials.json"), JSON.stringify({
+    client_id: "https://activitysmith.com/.well-known/oauth-client/activitysmith-cli.json",
+    issuer: "https://activitysmith.com",
+    resource: "https://activitysmith.com/api",
+    token_endpoint: "https://activitysmith.com/oauth/token",
+    access_token: "signed-in-token",
+    access_token_expires_at: new Date(Date.now() + 3_600_000).toISOString(),
+    refresh_token: "refresh",
+    scope,
+    signed_in_at: new Date().toISOString(),
+  }));
+  return dir;
+};
+
+test("devices list reads the paired devices and points to the App Store when there are none", async () => {
+  const empty = await runCliWithApi(["--api-key", "test", "devices", "list"], {
+    response: { devices: [], meta: { total: 0, limit: 100, offset: 0, has_more: false, next_offset: null, include_inactive: false } },
+  });
+  assert.equal(empty.code, 0, empty.stderr);
+  assert.equal(empty.requests[0].url, "https://activitysmith.com/api/account/devices");
+  assert.equal(empty.requests[0].method, "GET");
+  assert.equal(empty.requests[0].headers.Authorization, "Bearer test");
+  assert.match(empty.requests[0].headers["X-ActivitySmith-SDK"], /^cli-v/);
+  assert.match(empty.stdout, /No paired devices/);
+  assert.match(empty.stdout, /apps\.apple\.com/);
+
+  const paired = await runCliWithApi(["--api-key", "test", "devices", "--include-inactive"], {
+    response: {
+      devices: [{ user_email: "you@example.com", device_id: "dev-1", device_type: "iPhone", is_active: true, device_name: "Adam's iPhone", system_name: "iOS", system_version: "27.0" }],
+      meta: { total: 1, limit: 100, offset: 0, has_more: false, next_offset: null, include_inactive: true },
+    },
+  });
+  assert.equal(paired.requests[0].url, "https://activitysmith.com/api/account/devices?include_inactive=true");
+  assert.match(paired.stdout, /1 device, 1 active/);
+  assert.match(paired.stdout, /Adam's iPhone \(iPhone, iOS 27\.0, active, you@example\.com\) ID: dev-1/);
+});
+
+test("keys create uses the browser sign-in and can print only the key", async () => {
+  const dir = await signedInConfigDir("mcp:write api_keys:write");
+  const response = { api_key: { public_id: "pub", name: "GitHub Actions", key: "ask_secret", prefix: "ask_secret", scope_mode: "channels", channel_slugs: ["ops"] } };
+  const raw = await runCliWithApi(["keys", "create", "--name", "GitHub Actions", "--channels", "ops, alerts", "--raw"], {
+    response,
+    env: { ACTIVITYSMITH_CONFIG_DIR: dir, ACTIVITYSMITH_API_KEY: "ask_ignored" },
+  });
+  assert.equal(raw.code, 0, raw.stderr);
+  assert.equal(raw.requests[0].url, "https://activitysmith.com/api/account/api-keys");
+  assert.equal(raw.requests[0].method, "POST");
+  // API keys cannot create keys: the sign-in is used even when ACTIVITYSMITH_API_KEY is set.
+  assert.equal(raw.requests[0].headers.Authorization, "Bearer signed-in-token");
+  assert.deepEqual(raw.requests[0].body, { name: "GitHub Actions", channels: ["ops", "alerts"] });
+  assert.equal(raw.stdout, "ask_secret");
+  assert.match(raw.stderr, /Created API key "GitHub Actions"/);
+
+  const shown = await runCliWithApi(["keys", "create", "--name", "GitHub Actions"], { response, env: { ACTIVITYSMITH_CONFIG_DIR: dir } });
+  assert.match(shown.stdout, /Key: ask_secret/);
+  assert.match(shown.stdout, /only time the key is shown/);
+});
