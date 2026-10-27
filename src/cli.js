@@ -1738,7 +1738,7 @@ const apiRequest = async (path, { token, method = "GET", body } = {}) => {
 const describeDevice = (device) => {
   const name = device.device_name || device.device_type || "Device";
   const system = [device.system_name, device.system_version].filter(Boolean).join(" ");
-  const details = [device.device_type, system, device.is_active ? "active" : "inactive", device.user_email].filter(Boolean);
+  const details = [system, device.is_active ? "active" : "inactive", device.user_email].filter(Boolean);
   return `- ${name} (${details.join(", ")}) ID: ${device.device_id}`;
 };
 

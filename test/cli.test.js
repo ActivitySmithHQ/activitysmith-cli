@@ -456,13 +456,13 @@ test("devices list reads the paired devices and points to the App Store when the
 
   const paired = await runCliWithApi(["--api-key", "test", "devices", "--include-inactive"], {
     response: {
-      devices: [{ user_email: "you@example.com", device_id: "dev-1", device_type: "iPhone", is_active: true, device_name: "Adam's iPhone", system_name: "iOS", system_version: "27.0" }],
+      devices: [{ user_email: "you@example.com", device_id: "dev-1", device_type: "ios", is_active: true, device_name: "Adam's iPhone", system_name: "iOS", system_version: "27.0" }],
       meta: { total: 1, limit: 100, offset: 0, has_more: false, next_offset: null, include_inactive: true },
     },
   });
   assert.equal(paired.requests[0].url, "https://activitysmith.com/api/account/devices?include_inactive=true");
   assert.match(paired.stdout, /1 device, 1 active/);
-  assert.match(paired.stdout, /Adam's iPhone \(iPhone, iOS 27\.0, active, you@example\.com\) ID: dev-1/);
+  assert.match(paired.stdout, /Adam's iPhone \(iOS 27\.0, active, you@example\.com\) ID: dev-1/);
 });
 
 test("keys create uses the browser sign-in and can print only the key", async () => {
