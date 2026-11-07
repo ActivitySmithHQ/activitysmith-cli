@@ -1,3 +1,7 @@
+## 1.18.0
+
+Adds `activitysmith push dismiss` to clear a Push Notification you already sent from the Lock Screen and Notification Center, using the Notification ID from its send output. History keeps it. Also adds `activitysmith metrics create` to create a Lock Screen Widget metric and set its label and format, such as currency or percent.
+
 ## 1.17.0
 
 Adds approvals. Your agents can now ask for your approval before they act, such as sending an email or deploying. `activitysmith approval request` shows the request on your iPhone and waits for your answer. It exits with code 0 only when you approve, so the agent continues only after that. `approval wait`, `approval get`, and `approval cancel` work with a request you already sent.

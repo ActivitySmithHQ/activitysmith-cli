@@ -1282,10 +1282,11 @@ const outputResult = (payload, options, lines) => {
   lines.filter(Boolean).forEach((line) => console.log(line));
 };
 
-program
+const pushCommand = program
   .command("push")
-  .description("Send a push notification, or replace one you already sent")
-  .requiredOption("--title <title>", "Push title")
+  .description("Send a push notification, or replace or dismiss one you already sent")
+  // Not requiredOption: commander would then demand --title for the dismiss subcommand too.
+  .option("--title <title>", "Push title (required to send or replace)")
   .option(
     "--replace <notification-id>",
     "Silently replace a sent push notification, using the notification ID from its send output"
@@ -1321,6 +1322,10 @@ program
     .option("--metadata-file <path>", "Path to a Metadata JSON object file")
     .action(async (options) => {
     const globalOptions = program.opts();
+
+    if (options.title === undefined) {
+      pushCommand.error("error: required option '--title <title>' not specified");
+    }
 
     try {
       const apiKey = await requireApiKey(globalOptions);
@@ -1384,6 +1389,35 @@ program
           ? `Devices notified: ${devicesNotified}`
           : null,
         notificationId ? `Notification ID: ${notificationId}` : null,
+      ]);
+    } catch (error) {
+      await handleError(error, globalOptions);
+    }
+  });
+
+pushCommand
+  .command("dismiss")
+  .description(
+    "Clear a sent push notification from the Lock Screen and Notification Center. History keeps it."
+  )
+  .argument("<notification-id>", "Notification ID from the push send output")
+  .action(async (notificationId) => {
+    const globalOptions = program.opts();
+
+    try {
+      const id = String(notificationId).trim();
+      if (!id) {
+        throw new Error("Notification ID is required.");
+      }
+      const apiKey = await requireApiKey(globalOptions);
+      const client = createClient(apiKey);
+      const response = await client.notifications.dismiss(id);
+      const dismissedAt = response?.dismissed_at ?? response?.dismissedAt;
+
+      outputResult(response, globalOptions, [
+        "Push dismissed.",
+        `Notification ID: ${response?.notification_id ?? response?.notificationId ?? id}`,
+        dismissedAt ? `Dismissed at: ${dismissedAt}` : null,
       ]);
     } catch (error) {
       await handleError(error, globalOptions);
