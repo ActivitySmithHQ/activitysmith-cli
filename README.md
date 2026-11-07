@@ -111,22 +111,6 @@ activitysmith keys create --name "Ops alerts" --channels ops,alerts
 
 An API key cannot create another key. This command always uses the browser sign-in, even when `ACTIVITYSMITH_API_KEY` is set.
 
-## Paired Devices
-
-List the iPhones and iPads paired to your account. Active devices come first:
-
-```bash
-activitysmith devices list
-```
-
-If no device is paired, the command prints the App Store link. Install ActivitySmith on your iPhone, sign in with the same account, and allow notifications.
-
-Add `--include-inactive` to also list devices that can no longer receive deliveries:
-
-```bash
-activitysmith devices list --include-inactive
-```
-
 ## Push Notifications
 
 ### Send a Push Notification
@@ -313,7 +297,9 @@ activitysmith push \
 
 ### Dismiss a Push Notification
 
-Pass the `Notification ID` to `push dismiss` when a Push Notification no longer needs attention, for example after you answered an agent's question somewhere else. Dismissing clears it from the Lock Screen and Notification Center on every device it was sent to. History keeps it.
+Pass the `Notification ID` to `push dismiss` when a Push Notification no longer needs attention, for example after you answered an agent's question somewhere else.
+
+Dismissing clears it from the Lock Screen and Notification Center on every device it was sent to. History keeps it.
 
 Devices clear the notification in the background, so it can take a moment.
 
@@ -863,6 +849,22 @@ activitysmith activity stream nightly-backup \
 
 ```bash
 activitysmith badge 3 --channels "sales,customer-success"
+```
+
+## Paired Devices
+
+List the iPhones and iPads paired to your account. Active devices come first:
+
+```bash
+activitysmith devices list
+```
+
+If no device is paired, the command prints the App Store link. Install ActivitySmith on your iPhone, sign in with the same account, and allow notifications.
+
+Add `--include-inactive` to also list devices that can no longer receive deliveries:
+
+```bash
+activitysmith devices list --include-inactive
 ```
 
 ## Output
