@@ -311,6 +311,21 @@ activitysmith push \
   --message "Error rate is back to normal. Incident resolved."
 ```
 
+### Dismiss a Push Notification
+
+Pass the `Notification ID` to `push dismiss` when a Push Notification no longer needs attention, for example after you answered an agent's question somewhere else. Dismissing clears it from the Lock Screen and Notification Center on every device it was sent to. History keeps it.
+
+Devices clear the notification in the background, so it can take a moment.
+
+```bash
+activitysmith push \
+  --title "🙋 Agent needs your input" \
+  --message "Approve the database migration?"
+# Notification ID: Xk3pQ8mV2nR7tL9wB4yZ
+
+activitysmith push dismiss "Xk3pQ8mV2nR7tL9wB4yZ"
+```
+
 ## Live Activities
 
 Choose the Live Activity type that matches what you want to show:
@@ -654,11 +669,9 @@ activitysmith activity stream agent-approval \
 
 ![Lock screen widgets](https://cdn.activitysmith.com/features/lock-screen-widgets.png)
 
-ActivitySmith lets you display any value on your Lock Screen with widgets - SaaS metrics, revenue, signups, uptime, habits, or anything else you want to track. Create a metric in the [web app](https://activitysmith.com/app/widgets), then update the metric value using our API, add a widget to your lock screen and it will fetch the latest update automatically.
+ActivitySmith lets you display any value on your Lock Screen with widgets - SaaS metrics, revenue, signups, uptime, habits, or anything else you want to track. Send a value to a metric key, add a widget to your Lock Screen, and it fetches the latest value automatically.
 
-![Create widget metric](https://cdn.activitysmith.com/features/create-widget-metric.png)
-
-Use the metric key to update its value.
+Use the metric key to update its value. The first value creates the metric.
 
 ```bash
 activitysmith metrics update deploy.success_rate 99.9
@@ -669,6 +682,23 @@ String metric values work too.
 ```bash
 activitysmith metrics update prod.status healthy
 ```
+
+### Create a metric
+
+Use `create` to set the label and how widgets show the value, such as currency, percent, or a unit. Omitted fields keep their current values, so you can call it every time your app starts.
+
+```bash
+activitysmith metrics create mrr \
+  --label MRR \
+  --format currency \
+  --currency-code USD
+
+activitysmith metrics update mrr 12450
+```
+
+You can also create and edit metrics in the [web app](https://activitysmith.com/app/widgets).
+
+![Create widget metric](https://cdn.activitysmith.com/features/create-widget-metric.png)
 
 ## App Icon Badge
 
