@@ -47,6 +47,7 @@ If it prints `No paired devices.`, give the user the App Store link it prints. A
 
 - Push Notification: one important event, completion, blocker, review request, or handoff.
 - Push Notification replacement: an earlier Push Notification is out of date and should be swapped, not stacked.
+- Push Notification dismissal: an earlier Push Notification no longer needs attention, such as a question the user already answered somewhere else.
 - Push Notification with redirection: tapping the notification should open a URL or run a specific Shortcut that already exists on the user's iPhone.
 - Push Notification with actions: long-press should show up to 4 buttons.
 - Live Activity: a real-time metric, operational state, or ongoing task should stay visible.
@@ -93,6 +94,14 @@ Use this to update a Push Notification you already sent, for example when an inc
   -R "Xk3pQ8mV2nR7tL9wB4yZ" \
   -t "✅ checkout-api recovered" \
   -m "Error rate is back to normal. Incident resolved."
+```
+
+### Dismiss A Notification That No Longer Needs Attention
+
+Use this when a Push Notification you sent is no longer relevant, for example after you asked the user a question and they answered it in the terminal. Pass its `Notification ID` to clear it from the Lock Screen and Notification Center. History keeps it.
+
+```bash
+activitysmith push dismiss "Xk3pQ8mV2nR7tL9wB4yZ"
 ```
 
 ### Notify With A Shortcut Tap Target
@@ -221,6 +230,12 @@ String values work too:
 
 ```bash
 activitysmith metrics update prod.status healthy
+```
+
+The first value creates the metric. To set its label and format, such as currency or percent, run `metrics create` first. It is safe to run again:
+
+```bash
+activitysmith metrics create mrr --label MRR --format currency --currency-code USD
 ```
 
 ### Store An API Key For CI

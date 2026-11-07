@@ -390,6 +390,27 @@ test("push --replace rejects options that only apply to new sends", async () => 
   }
 });
 
+test("push dismiss clears a sent push notification", async () => {
+  const result = await runCli(["push", "dismiss", "pn-1"]);
+
+  assert.equal(result.code, 0, result.stderr);
+  assert.equal(result.request.method, "POST");
+  assert.match(result.request.url, /\/push-notification\/pn-1\/dismiss$/);
+});
+
+test("push dismiss needs a notification ID and no title", async () => {
+  const missing = await runCli(["push", "dismiss"]);
+  assert.notEqual(missing.code, 0);
+  assert.equal(missing.request, null);
+});
+
+test("push still requires a title when sending", async () => {
+  const result = await runCli(["push", "--message", "No title"]);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stdout + result.stderr, /--title/);
+  assert.equal(result.request, null);
+});
+
 // Runs the CLI with a fake API that answers every request with `response` and records the requests.
 const runCliWithApi = (args, { response, env = {} }) =>
   new Promise((resolve, reject) => {
@@ -593,4 +614,36 @@ test("metrics update rejects Metadata options before sending", async () => {
     assert.match(result.stdout + result.stderr, /unknown option/);
     assert.equal(result.request, null);
   }
+});
+
+test("metrics create sends the metric definition", async () => {
+  const result = await runCli([
+    "metrics",
+    "create",
+    "mrr",
+    "--label",
+    "MRR",
+    "--format",
+    "currency",
+    "--currency-code",
+    "USD",
+  ]);
+
+  assert.equal(result.code, 0, result.stderr);
+  assert.equal(result.request.method, "PUT");
+  assert.equal(result.request.url, "https://activitysmith.com/api/metrics/mrr");
+  assert.deepEqual(result.request.body, {
+    label: "MRR",
+    format: "currency",
+    currency_code: "USD",
+  });
+});
+
+test("metrics create without options uses the API defaults", async () => {
+  const result = await runCli(["metrics", "create", "deploy.success_rate"]);
+
+  assert.equal(result.code, 0, result.stderr);
+  assert.equal(result.request.method, "PUT");
+  assert.equal(result.request.url, "https://activitysmith.com/api/metrics/deploy.success_rate");
+  assert.equal(result.request.body, null);
 });
