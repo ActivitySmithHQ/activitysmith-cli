@@ -391,7 +391,7 @@ const validateContentState = (contentState, mode) => {
   const normalizedType =
     typeof contentState.type === "string" ? contentState.type.trim() : undefined;
 
-  if (!isNonEmptyString(contentState.title)) {
+  if (typeof contentState.title !== "string") {
     throw new Error("contentState.title is required");
   }
 

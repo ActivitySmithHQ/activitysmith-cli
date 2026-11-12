@@ -103,6 +103,21 @@ test("Live Activity start includes tags", async () => {
   assert.deepEqual(result.request.body.tags, ["user:382", "customer-import"]);
 });
 
+test("Live Activity start sends an empty title but requires the field", async () => {
+  const flags = await runCli(["activity", "start", "--title", "", "--type", "value", "--value", "1"]);
+  assert.equal(flags.code, 0, flags.stderr);
+  assert.equal(flags.request.body.content_state.title, "");
+
+  const json = await runCli(["activity", "start", "--content-state", '{"type":"value","title":"","value":"1"}']);
+  assert.equal(json.code, 0, json.stderr);
+  assert.equal(json.request.body.content_state.title, "");
+
+  const missing = await runCli(["activity", "start", "--content-state", '{"type":"value","value":"1"}']);
+  assert.notEqual(missing.code, 0);
+  assert.match(missing.stdout, /contentState.title is required/);
+  assert.equal(missing.request, null);
+});
+
 test("Live Activity stream includes tags", async () => {
   const result = await runCli([
     "activity",
