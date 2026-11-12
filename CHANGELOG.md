@@ -1,3 +1,7 @@
+## 1.18.1
+
+`activitysmith activity start` now accepts an empty Live Activity title, such as `--title ""`, so you can leave the title row blank. The title is still required, so leaving it out still fails before anything is sent.
+
 ## 1.18.0
 
 Adds `activitysmith push dismiss` to clear a Push Notification you already sent from the Lock Screen and Notification Center, using the Notification ID from its send output. History keeps it. Also adds `activitysmith metrics create` to create a Lock Screen Widget metric and set its label and format, such as currency or percent.
