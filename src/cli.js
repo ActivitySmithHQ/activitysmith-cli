@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { Command, InvalidArgumentError, Option } from "commander";
+import { agentHeaders } from "./agent.js";
 import { loadMetadata } from "./metadata.js";
 import {
   API_KEYS_SCOPE,
@@ -283,6 +284,12 @@ const credentialSource = (options) => {
   if (options.apiKey) return "--api-key";
   if (process.env.ACTIVITYSMITH_API_KEY) return "ACTIVITYSMITH_API_KEY";
   return readCredentials() ? "auth login" : null;
+};
+
+// Names the coding agent running the CLI, so its Push Notifications show that agent's icon.
+const agentRequestInit = () => {
+  const headers = agentHeaders();
+  return Object.keys(headers).length > 0 ? { headers } : undefined;
 };
 
 const createClient = (apiKey) =>
@@ -1373,10 +1380,10 @@ const pushCommand = program
 
       const isReplacement = options.replace !== undefined;
       const response = isReplacement
-        ? await client.notifications.replace(options.replace.trim(), pushNotificationRequest)
+        ? await client.notifications.replace(options.replace.trim(), pushNotificationRequest, agentRequestInit())
         : await client.notifications.sendPushNotification({
             pushNotificationRequest,
-          });
+          }, agentRequestInit());
       const devicesNotified = response?.devices_notified ?? response?.devicesNotified;
       const notificationId = response?.notification_id ?? response?.notificationId;
 
@@ -1790,6 +1797,7 @@ const apiRequest = async (path, { token, method = "GET", body } = {}) => {
       Authorization: `Bearer ${token}`,
       Accept: "application/json",
       "X-ActivitySmith-SDK": `cli-v${version}`,
+      ...agentHeaders(),
       ...(body ? { "Content-Type": "application/json" } : {}),
     },
     ...(body ? { body: JSON.stringify(body) } : {}),

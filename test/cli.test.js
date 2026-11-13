@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import test from "node:test";
+import { AGENT_ENV_VARS, detectAgent } from "../src/agent.js";
 
 const runCli = (args) =>
   new Promise((resolve, reject) => {
@@ -427,6 +428,9 @@ test("push still requires a title when sending", async () => {
 });
 
 // Runs the CLI with a fake API that answers every request with `response` and records the requests.
+// Tests run inside coding agents too; clear their markers so requests stay predictable.
+const withoutAgentEnv = (env) => Object.fromEntries(Object.entries(env).filter(([key]) => !AGENT_ENV_VARS.includes(key)));
+
 const runCliWithApi = (args, { response, env = {} }) =>
   new Promise((resolve, reject) => {
     const runner = `
@@ -444,7 +448,7 @@ const runCliWithApi = (args, { response, env = {} }) =>
     `;
     const child = spawn(process.execPath, ["--input-type=module", "--eval", runner], {
       cwd: process.cwd(),
-      env: { ...process.env, ...env, CLI_TEST_ARGS: JSON.stringify(args), CLI_TEST_RESPONSE: JSON.stringify(response) },
+      env: { ...withoutAgentEnv(process.env), ...env, CLI_TEST_ARGS: JSON.stringify(args), CLI_TEST_RESPONSE: JSON.stringify(response) },
     });
     let stdout = "";
     let stderr = "";
@@ -556,6 +560,51 @@ test("approval request sends the question and context, then exits 0 when approve
   assert.equal(wait.method, "GET");
   assert.match(result.stderr, /Waiting for the decision on the iPhone\. Approval ID: apr_1/);
   assert.equal(result.stdout, "Approved.");
+});
+
+test("approval request names the coding agent that runs the CLI", async () => {
+  const fromClaudeCode = await runCliWithApi(["--api-key", "test", "approval", "request", "Deploy?"], {
+    response: approvalResponse("approved"),
+    env: { CLAUDECODE: "1", AI_AGENT: "claude-code_2-1-321_agent" },
+  });
+  assert.equal(fromClaudeCode.code, 0, fromClaudeCode.stderr);
+  assert.equal(fromClaudeCode.requests[0].headers["X-ActivitySmith-Agent"], "claude-code");
+  assert.equal("agent" in fromClaudeCode.requests[0].body, false);
+
+  const fromTerminal = await runCliWithApi(["--api-key", "test", "approval", "request", "Deploy?"], {
+    response: approvalResponse("approved"),
+  });
+  assert.equal("X-ActivitySmith-Agent" in fromTerminal.requests[0].headers, false);
+});
+
+test("push and push --replace name the coding agent that runs the CLI", async () => {
+  const response = { success: true, notification_id: "pn_1", devices_notified: 1 };
+  const env = { CODEX_THREAD_ID: "thread-1" };
+  for (const extra of [[], ["--replace", "pn_1"]]) {
+    const result = await runCliWithApi(["--api-key", "test", "push", "--title", "Done", ...extra], { response, env });
+    assert.equal(result.code, 0, result.stderr);
+    assert.equal(result.requests[0].headers["X-ActivitySmith-Agent"], "codex");
+    assert.equal(result.requests[0].headers.Authorization, "Bearer test");
+    assert.match(result.requests[0].headers["X-ActivitySmith-SDK"], /^cli-v/);
+  }
+
+  const fromTerminal = await runCliWithApi(["--api-key", "test", "push", "--title", "Done"], { response });
+  assert.equal("X-ActivitySmith-Agent" in fromTerminal.requests[0].headers, false);
+});
+
+test("detectAgent reads the markers each agent sets", () => {
+  assert.equal(detectAgent({}), null);
+  assert.equal(detectAgent({ AI_AGENT: "claude-code_2-1-321_agent" }), "claude-code");
+  assert.equal(detectAgent({ CLAUDECODE: "1" }), "claude-code");
+  assert.equal(detectAgent({ CLAUDECODE: "1", CLAUDE_CODE_IS_COWORK: "1", AI_AGENT: "claude-code_2_agent" }), "claude-cowork");
+  assert.equal(detectAgent({ CODEX_THREAD_ID: "t1" }), "codex");
+  assert.equal(detectAgent({ CODEX_SANDBOX: "seatbelt" }), "codex");
+  assert.equal(detectAgent({ CURSOR_AGENT: "1" }), "cursor");
+  assert.equal(detectAgent({ CURSOR_TRACE_ID: "abc" }), "cursor");
+  // An agent running inside Cursor's terminal is still that agent.
+  assert.equal(detectAgent({ CURSOR_TRACE_ID: "abc", CLAUDECODE: "1" }), "claude-code");
+  assert.equal(detectAgent({ CURSOR_TRACE_ID: "abc", CODEX_THREAD_ID: "t1" }), "codex");
+  assert.equal(detectAgent({ AI_AGENT: "something-new" }), null);
 });
 
 test("approval request exits 1 when the request is rejected, timed out, or cancelled", async () => {
