@@ -1,3 +1,7 @@
+## 1.19.0
+
+Push Notifications and approval requests now name the coding agent that runs the CLI. From Claude Code, Codex, or Cursor, a Push Notification without `--icon` shows that agent's icon, and an approval arrives as "Claude Code needs your approval" with the Claude icon instead of "ActivitySmith CLI". The CLI reads the agent from the environment it sets and sends it as the `X-ActivitySmith-Agent` header. Commands run from a plain terminal send nothing new.
+
 ## 1.18.1
 
 `activitysmith activity start` now accepts an empty Live Activity title, such as `--title ""`, so you can leave the title row blank. The title is still required, so leaving it out still fails before anything is sent.
