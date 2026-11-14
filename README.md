@@ -710,9 +710,7 @@ activitysmith badge 0
 
 ## Approvals
 
-![Approval Live Activity on an iPhone Lock Screen with Send and Deny buttons](https://cdn.activitysmith.com/features/ai-agent-approval-live-activity-phone.png)
-
-Let your agents ask for your approval before they act, such as sending an email to customers or deploying to production. The request reaches your iPhone as a Live Activity or an actionable Push Notification, both with two buttons. The agent waits until you tap one and continues only when you approve.
+Let your agents ask for your approval before they act, such as sending an email to customers or deploying to production. The request reaches your iPhone as a Time Sensitive Push Notification. Tap it to open the request on a review screen in the ActivitySmith app. Approve or reject it, or write a reply. The agent waits for your answer and continues only when you approve.
 
 ```bash
 activitysmith approval request "Send the pricing update email to 214 customers?" \
@@ -732,10 +730,12 @@ Exit codes for `approval request` and `approval wait`:
 - `1`: Rejected, timed out after 30 minutes, or cancelled. Do not continue.
 - `2`: The request failed, for example because no device is paired.
 - `3`: Still pending after `--timeout`, or sent with `--no-wait`.
+- `4`: Replied. The reply text follows `Reply:`. Follow the reply instead of the original action.
+- `5`: Chosen. The chosen option follows `Chosen:` and `Option ID:`. Do that option.
 
 ### Show the exact command
 
-Add `--command` with the exact command that waits for approval. The request shows the command and the current directory:
+Add `--command` with the exact command that waits for approval. The review screen shows the command and the current directory:
 
 ```bash
 activitysmith approval request "Run the database migration?" \
@@ -743,7 +743,61 @@ activitysmith approval request "Run the database migration?" \
   --command "npm run db:migrate -- --env production"
 ```
 
-Add `--details` for short context. Add `--scope` to show where the action applies, such as `environment:production`.
+Add `--details` for context, up to 4,000 characters. Add `--scope` to show where the action applies, such as `environment:production`.
+
+### Add changes, links, and screenshots
+
+Give the review screen what you need to decide:
+
+```bash
+activitysmith approval request "Deploy the new checkout to production?" \
+  --approve-label "Deploy" \
+  --git-changes main...HEAD \
+  --link "Pull request=https://github.com/acme/shop/pull/42" \
+  --screenshot "shots/checkout.png=New checkout"
+```
+
+- `--git-changes` adds each changed file with its added and removed line counts from `git diff`. Without a range, it uses the uncommitted changes. File contents are never sent.
+- `--change <path:added:removed>` adds one file by hand, such as `src/app.ts:12:3`.
+- `--link <title=url>` adds an https link that opens in the app. Add up to 5.
+- `--screenshot <file=title>` uploads a PNG, JPEG, or WebP file of up to 2 MB. The title is optional. Add up to 5.
+
+Screenshots are deleted 7 days after the decision.
+
+### Offer options
+
+Ask the user to pick one of 2 to 4 options instead of approve or reject. Give each option an ID and a label. Add `--recommended` to mark the option you would pick:
+
+```bash
+activitysmith approval request "Which settings layout should I ship?" \
+  --option "tabs=Tabs across the top" \
+  --option "sidebar=Sidebar navigation" \
+  --recommended sidebar \
+  --option-screenshot tabs=shots/tabs.png \
+  --option-screenshot sidebar=shots/sidebar.png
+```
+
+The review screen letters the options A to D. When you choose one, the command prints the option and exits with code `5`:
+
+```text
+Chosen: Sidebar navigation
+Option ID: sidebar
+Do the chosen option.
+```
+
+Without an ID, as in `--option "Sidebar navigation"`, the options get the IDs `a`, `b`, `c`, and `d`.
+
+### Read a reply
+
+On the review screen, you can write a reply instead of a decision, such as "Send it tomorrow at 9 instead." The command then prints the reply and exits with code `4`:
+
+```text
+Replied. Read the reply and follow it. Do not run the original action unless the reply says to.
+Reply:
+Send it tomorrow at 9 instead.
+```
+
+Add `--json` to get the full approval with `status`, `reply`, `selected_option_id`, and `selected_option`.
 
 ### Wait in steps
 
@@ -761,19 +815,9 @@ activitysmith approval get apr_Xk3pQ8mV2nR7tL9w
 activitysmith approval cancel apr_Xk3pQ8mV2nR7tL9w
 ```
 
-Cancel a request when the action is no longer needed. Its buttons stop working, and a Live Activity updates to show the request was cancelled.
+Cancel a request when the action is no longer needed. Its Push Notification is removed from your devices.
 
-### Change how the request looks
-
-By default, the request is a Live Activity, with an actionable Push Notification as the fallback. Add `--delivery push_notification` to always send a Push Notification, or `--delivery live_activity` to always send a Live Activity. Use `--badge`, `--color`, and `--icon` to change the Live Activity:
-
-```bash
-activitysmith approval request "Refund order #4821 for $129?" \
-  --approve-label "Refund" \
-  --badge "Billing" \
-  --color orange \
-  --icon creditcard
-```
+`--delivery`, `--color`, `--icon`, and `--badge` are no longer used. The CLI still accepts them so older scripts keep working, and ignores them.
 
 ## Metadata
 
