@@ -1,3 +1,7 @@
+## 1.20.1
+
+Approval requests with `--git-changes` now show a simpler summary of your changes: how many files changed, the lines added and removed, and the 2 most changed files.
+
 ## 1.20.0
 
 New and improved approvals. Your agent can now show you more before you decide, like screenshots, changed files, and links, and you can answer with more than yes or no. Pick one of several options, or write a reply, and the agent gets your answer right away.
