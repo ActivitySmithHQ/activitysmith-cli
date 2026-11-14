@@ -4,6 +4,19 @@ import { Command, InvalidArgumentError, Option } from "commander";
 import { agentHeaders } from "./agent.js";
 import { loadMetadata } from "./metadata.js";
 import {
+  APPROVAL_LIMITS,
+  approvalResultLines,
+  buildApprovalChanges,
+  buildApprovalOptions,
+  parseChangeArgument,
+  parseLinkArgument,
+  parseOptionArgument,
+  parseOptionScreenshotArgument,
+  parseScreenshotArgument,
+  readGitChanges,
+  readScreenshotFile,
+} from "./approvals.js";
+import {
   API_KEYS_SCOPE,
   DEFAULT_API_RESOURCE,
   LOGIN_SCOPES,
@@ -1790,7 +1803,8 @@ const APP_STORE_URL = "https://apps.apple.com/us/app/activitysmith/id6752254835"
 
 // Account endpoints the generated SDK does not cover. Same API and SDK header as the SDK client, so
 // errors print the same way and usage shows the CLI version.
-const apiRequest = async (path, { token, method = "GET", body } = {}) => {
+// `rawBody` with `contentType` sends bytes as they are, such as a screenshot upload.
+const apiRequest = async (path, { token, method = "GET", body, rawBody, contentType } = {}) => {
   const response = await fetch(`${DEFAULT_API_RESOURCE}${path}`, {
     method,
     headers: {
@@ -1798,9 +1812,9 @@ const apiRequest = async (path, { token, method = "GET", body } = {}) => {
       Accept: "application/json",
       "X-ActivitySmith-SDK": `cli-v${version}`,
       ...agentHeaders(),
-      ...(body ? { "Content-Type": "application/json" } : {}),
+      ...(rawBody ? { "Content-Type": contentType } : body ? { "Content-Type": "application/json" } : {}),
     },
-    ...(body ? { body: JSON.stringify(body) } : {}),
+    ...(rawBody ? { body: rawBody } : body ? { body: JSON.stringify(body) } : {}),
   });
   if (!response.ok) {
     const error = new Error(`Request failed with status ${response.status}`);
@@ -1913,12 +1927,19 @@ keysCommand
   });
 
 // Approvals. Agents ask the user for approval before an action the user wants to approve, such as
-// sending an email or deploying, and go ahead only when this exits 0.
+// sending an email or deploying, and go ahead only when this exits 0. The request is a Push
+// Notification that opens a review screen in the iOS app (backend docs/approval-review.md).
 const APPROVAL_SCOPE_TYPES = ["working_directory", "repository", "project", "environment", "customer", "account", "resource"];
-const APPROVAL_COLORS = ["lime", "green", "cyan", "blue", "purple", "magenta", "red", "orange", "yellow", "gray"];
 // Each request waits at most this long on the server, then the CLI asks again.
 const APPROVAL_POLL_SECONDS = 45;
-const APPROVAL_EXIT = { approved: 0, not_approved: 1, error: 2, pending: 3 };
+const APPROVAL_EXIT = { approved: 0, not_approved: 1, error: 2, pending: 3, replied: 4, chosen: 5 };
+// Approvals are always Push Notifications now. The API ignores these, so old scripts keep working.
+const DEPRECATED_APPROVAL_FLAGS = [
+  ["delivery", "--delivery"],
+  ["color", "--color"],
+  ["icon", "--icon"],
+  ["badge", "--badge"],
+];
 
 const parseApprovalScope = (value) => {
   const separator = value.indexOf(":");
@@ -1932,13 +1953,6 @@ const parseApprovalScope = (value) => {
   return { type, value: scopeValue };
 };
 
-const parseApprovalColor = (value) => {
-  if (!APPROVAL_COLORS.includes(value)) {
-    throw new InvalidArgumentError(`color must be one of ${APPROVAL_COLORS.join(", ")}`);
-  }
-  return value;
-};
-
 const parsePositiveSeconds = (value) => {
   const parsed = Number(value);
   if (!Number.isInteger(parsed) || parsed < 1) {
@@ -1947,11 +1961,20 @@ const parsePositiveSeconds = (value) => {
   return parsed;
 };
 
-const APPROVAL_RESULT_LINES = {
-  approved: "Approved.",
-  rejected: "Rejected. Do not continue with the action.",
-  timed_out: "Timed out. No decision within 30 minutes. Do not continue with the action.",
-  cancelled: "Cancelled. Do not continue with the action.",
+// Wraps a parser for a repeatable option so commander reports its errors as invalid arguments.
+const repeatable = (parse) => (value, previous = []) => {
+  try {
+    return [...previous, parse(value)];
+  } catch (error) {
+    throw new InvalidArgumentError(error.message);
+  }
+};
+
+const APPROVAL_EXIT_BY_STATUS = {
+  approved: APPROVAL_EXIT.approved,
+  replied: APPROVAL_EXIT.replied,
+  chosen: APPROVAL_EXIT.chosen,
+  pending: APPROVAL_EXIT.pending,
 };
 
 // Waits until the approval is decided, or until `timeoutSeconds` pass, then prints the result and exits.
@@ -1976,9 +1999,42 @@ const waitForApproval = async (approvalId, token, timeoutSeconds, globalOptions)
     ]);
     process.exit(APPROVAL_EXIT.pending);
   }
-  outputResult(result, globalOptions, [APPROVAL_RESULT_LINES[status] ?? `Status: ${status}`]);
-  process.exit(status === "approved" ? APPROVAL_EXIT.approved : APPROVAL_EXIT.not_approved);
+  outputResult(result, globalOptions, approvalResultLines(result.approval));
+  process.exit(APPROVAL_EXIT_BY_STATUS[status] ?? APPROVAL_EXIT.not_approved);
 };
+
+// Uploads each screenshot file once, even when --screenshot and --option-screenshot name the same file.
+const uploadApprovalScreenshots = async (screenshotArgs, optionScreenshotArgs, token, globalOptions) => {
+  const entries = [...screenshotArgs];
+  for (const { path } of optionScreenshotArgs) {
+    if (!entries.some((entry) => entry.path === path)) entries.push({ path });
+  }
+  if (entries.length > APPROVAL_LIMITS.maxScreenshots) {
+    throw new Error(`An approval can show at most ${APPROVAL_LIMITS.maxScreenshots} screenshots, not ${entries.length}.`);
+  }
+  const files = await Promise.all(entries.map((entry) => readScreenshotFile(entry.path)));
+
+  const idByPath = new Map();
+  const screenshots = [];
+  for (const [index, entry] of entries.entries()) {
+    if (!globalOptions.json) console.error(`Uploading screenshot ${entry.path}`);
+    const result = await apiRequest("/approvals/screenshots", {
+      token,
+      method: "POST",
+      rawBody: files[index].data,
+      contentType: files[index].contentType,
+    });
+    const id = result.screenshot?.id;
+    if (!id) throw new Error(`The API did not return a screenshot ID for ${entry.path}. Run the command again.`);
+    idByPath.set(entry.path, id);
+    screenshots.push({ id, ...(entry.title ? { title: entry.title } : {}) });
+  }
+  const screenshotIdByOption = Object.fromEntries(optionScreenshotArgs.map(({ id, path }) => [id, idByPath.get(path)]));
+  return { screenshots, screenshotIdByOption };
+};
+
+// A mistyped flag is a failed request (exit 2), not a rejection (exit 1).
+const exitWithApprovalError = (error) => process.exit(error.exitCode === 0 ? 0 : APPROVAL_EXIT.error);
 
 const approvalCommand = program
   .command("approval")
@@ -1986,18 +2042,24 @@ const approvalCommand = program
   .addHelpText(
     "after",
     `
+The request is a Push Notification. A tap opens a review screen where you approve, reject,
+choose an option, or reply with text.
+
 Exit codes for request and wait:
   0  Approved. Continue with the action.
   1  Rejected, timed out, or cancelled. Do not continue.
   2  The request failed, for example no paired device.
-  3  Still pending after --timeout or with --no-wait. Run approval wait with the approval ID.`
+  3  Still pending after --timeout or with --no-wait. Run approval wait with the approval ID.
+  4  Replied. The reply text follows "Reply:". Follow it instead of the original action.
+  5  Chosen. The chosen option follows "Chosen:" and "Option ID:". Do that option.`
   );
 
 approvalCommand
   .command("request")
-  .description("Send an approval request with two buttons to the iPhone and wait for the decision")
+  .description("Send an approval request to the iPhone and wait for the decision")
+  .exitOverride(exitWithApprovalError)
   .argument("<question>", 'The decision to make, such as "Send the pricing update email to 214 customers?"')
-  .option("--details <text>", "Short context that helps decide")
+  .option("--details <text>", "Context that helps decide, up to 4,000 characters. Shown in full on the review screen")
   .option("--approve-label <label>", "Approve button title, a concrete verb such as Send or Deploy", "Approve")
   .option("--reject-label <label>", "Reject button title, such as Cancel or Don't Send", "Reject")
   .option("--command <command>", "The exact command waiting for approval. Do not shorten or rewrite it")
@@ -2007,34 +2069,77 @@ approvalCommand
     `Where the action applies, such as environment:production. Types: ${APPROVAL_SCOPE_TYPES.join(", ")} (default: working_directory:<current directory> with --command)`,
     parseApprovalScope
   )
-  .addOption(
-    new Option("--delivery <surface>", "Live Activity, Push Notification, or auto: a Live Activity with a Push Notification fallback")
-      .choices(["auto", "live_activity", "push_notification"])
-      .default("auto")
+  .option(
+    "--option <[id=]label>",
+    "A choice instead of approve and reject. Repeat 2 to 4 times. IDs default to a, b, c, d",
+    repeatable(parseOptionArgument)
   )
-  .option("--color <color>", "Live Activity color (default: blue)", parseApprovalColor)
-  .option("--icon <symbol>", "SF Symbol for the Live Activity (default: sparkles)")
-  .option("--badge <title>", "Short Live Activity badge such as Email or Deploy (default: Agent)")
+  .option("--recommended <option-id>", "The option you would pick. At most one")
+  .option(
+    "--option-screenshot <option-id=file>",
+    "A screenshot that shows one option. Repeatable",
+    repeatable(parseOptionScreenshotArgument)
+  )
+  .option(
+    "--screenshot <file[=title]>",
+    "A PNG, JPEG, or WebP up to 2 MB to show on the review screen. Repeatable, 5 at most",
+    repeatable(parseScreenshotArgument)
+  )
+  .option(
+    "--git-changes [range]",
+    "Show the changed files and line counts from git diff: uncommitted changes, or a range such as main...HEAD"
+  )
+  .option("--change <path:added:removed>", "A changed file and its line counts, such as src/app.ts:12:3. Repeatable", repeatable(parseChangeArgument))
+  .option("--link <[title=]url>", "An https link to open from the review screen, such as a pull request. Repeatable, 5 at most", repeatable(parseLinkArgument))
   .option("--channels <slugs>", "Comma-separated channel slugs. Omit to ask on every paired device")
   .option("--timeout <seconds>", "Stop waiting after this many seconds and exit 3 if still pending", parsePositiveSeconds)
   .option("--no-wait", "Send the request, print the approval ID, and exit without waiting")
+  .option("--delivery <surface>", "Deprecated and ignored. Approvals are always Push Notifications")
+  .option("--color <color>", "Deprecated and ignored")
+  .option("--icon <symbol>", "Deprecated and ignored")
+  .option("--badge <title>", "Deprecated and ignored")
   .action(async (question, options) => {
     const globalOptions = program.opts();
 
     try {
-      const token = await requireApiKey(globalOptions);
+      const ignored = DEPRECATED_APPROVAL_FLAGS.filter(([key]) => options[key] !== undefined).map(([, flag]) => flag);
+      if (ignored.length > 0 && !globalOptions.json) {
+        console.error(`Ignoring ${ignored.join(", ")}: approvals are always Push Notifications.`);
+      }
+
       const tool = options.tool ?? (options.command ? "shell" : undefined);
-      if (options.command && !tool) throw new Error("Provide --tool with --command.");
       const scope = options.scope ?? (options.command ? { type: "working_directory", value: process.cwd() } : undefined);
-      const appearance = {
-        ...(options.color ? { color: options.color } : {}),
-        ...(options.icon ? { icon: { symbol: options.icon } } : {}),
-        ...(options.badge ? { badge: { title: options.badge } } : {}),
-      };
+      const optionScreenshotArgs = options.optionScreenshot ?? [];
+      const optionScreenshotPaths = Object.fromEntries(optionScreenshotArgs.map(({ id, path }) => [id, path]));
+      // Validate everything before uploading or sending anything.
+      const approvalOptions = buildApprovalOptions(options.option ?? [], {
+        recommended: options.recommended,
+        screenshots: optionScreenshotPaths,
+      });
+      const links = options.link ?? [];
+      if (links.length > APPROVAL_LIMITS.maxLinks) {
+        throw new Error(`An approval can show at most ${APPROVAL_LIMITS.maxLinks} links, not ${links.length}.`);
+      }
+      const changedFiles = [
+        ...(options.gitChanges !== undefined ? await readGitChanges(options.gitChanges) : []),
+        ...(options.change ?? []),
+      ];
+      const { changes, omitted } = buildApprovalChanges(changedFiles);
+      if (omitted > 0 && !globalOptions.json) {
+        console.error(`Showing the ${APPROVAL_LIMITS.maxChangedFiles} most changed files. ${omitted} more are left out.`);
+      }
       const channels = String(options.channels ?? "")
         .split(",")
         .map((slug) => slug.trim())
         .filter(Boolean);
+
+      const token = await requireApiKey(globalOptions);
+      const { screenshots, screenshotIdByOption } = await uploadApprovalScreenshots(
+        options.screenshot ?? [],
+        optionScreenshotArgs,
+        token,
+        globalOptions
+      );
 
       const result = await apiRequest("/approvals", {
         token,
@@ -2044,10 +2149,18 @@ approvalCommand
           ...(options.details ? { details: options.details } : {}),
           ...(tool ? { execution_context: { tool, ...(options.command ? { command: options.command } : {}) } } : {}),
           ...(scope ? { scope } : {}),
-          delivery: options.delivery,
+          ...(changes ? { changes } : {}),
+          ...(links.length > 0 ? { links } : {}),
+          ...(screenshots.length > 0 ? { screenshots } : {}),
+          ...(approvalOptions
+            ? {
+                options: approvalOptions.map((option) =>
+                  screenshotIdByOption[option.id] ? { ...option, screenshot_id: screenshotIdByOption[option.id] } : option
+                ),
+              }
+            : {}),
           approve_label: options.approveLabel,
           reject_label: options.rejectLabel,
-          ...(Object.keys(appearance).length > 0 ? { appearance } : {}),
           ...(channels.length > 0 ? { target_channel_slugs: channels } : {}),
         },
       });
@@ -2073,6 +2186,7 @@ approvalCommand
 approvalCommand
   .command("wait")
   .description("Wait for the decision on an approval request")
+  .exitOverride(exitWithApprovalError)
   .argument("<approval-id>", "Approval ID from approval request")
   .option("--timeout <seconds>", "Stop waiting after this many seconds and exit 3 if still pending", parsePositiveSeconds)
   .action(async (approvalId, options) => {
@@ -2096,9 +2210,8 @@ approvalCommand
     try {
       const token = await requireApiKey(globalOptions);
       const result = await apiRequest(`/approvals/${encodeURIComponent(approvalId)}`, { token });
-      const status = result.approval?.status;
       outputResult(result, globalOptions, [
-        status === "pending" ? "Pending." : (APPROVAL_RESULT_LINES[status] ?? `Status: ${status}`),
+        ...approvalResultLines(result.approval),
         `Approval ID: ${approvalId}`,
         result.approval?.question ? `Question: ${result.approval.question}` : null,
       ]);

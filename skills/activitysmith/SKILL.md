@@ -213,10 +213,26 @@ activitysmith approval request "Send the pricing update email to 214 customers?"
 
 - Exit `0` (`Approved.`): do the action.
 - Exit `1` (rejected, timed out, or cancelled): do not do the action. Tell the user.
-- Exit `3` (`Still pending`): run `activitysmith approval wait <approval-id> --timeout 100`. Repeat until it exits `0` or `1`.
+- Exit `4` (`Replied.`): the user wrote a reply instead of deciding. Read the text after `Reply:` and follow it. Do not run the original action unless the reply says to.
+- Exit `3` (`Still pending`): run `activitysmith approval wait <approval-id> --timeout 100`. Repeat until it exits with another code.
 - Exit `2`: the request failed. Report the error and do not do the action.
 
-Write a question the user can answer from the Lock Screen. Use a concrete approve label, such as Send, Deploy, or Buy. For a shell command, pass the exact command with `--command`. If the action is no longer needed, run `activitysmith approval cancel <approval-id>`.
+The question is the Push Notification title. Keep it short. The user taps the notification to open a review screen with everything else. Use a concrete approve label, such as Send, Deploy, or Buy. For a shell command, pass the exact command with `--command`. Add `--details` for context, `--git-changes` before a commit, push, or deploy, `--link` for a pull request or preview, and `--screenshot <file>` for visual changes. If the action is no longer needed, run `activitysmith approval cancel <approval-id>`.
+
+When the user should pick between 2 to 4 approaches, offer options instead of approve and reject:
+
+```bash
+activitysmith approval request "Which settings layout should I ship?" \
+  --option "tabs=Tabs across the top" \
+  --option "sidebar=Sidebar navigation" \
+  --recommended sidebar \
+  --option-screenshot tabs=shots/tabs.png \
+  --option-screenshot sidebar=shots/sidebar.png \
+  --timeout 100
+```
+
+- Exit `5` (`Chosen:`): do the option whose ID follows `Option ID:`.
+- Exit `4`: follow the reply, as above.
 
 ### Update A Widget Metric
 
@@ -283,6 +299,6 @@ activitysmith badge 3 --channels "sales,customer-success"
 - For long-running progress, start one Live Activity, update it, then end it.
 - Add tags when the user wants related Push Notifications and Live Activities grouped in history.
 - Capture the Activity ID when using start/update/end.
-- Never do an action the user asked to approve without an `Approved.` result. One approval covers one action.
+- Never do an action the user asked to approve without an `Approved.` result, or a `Chosen:` or `Replied.` result that asks for it. One approval covers one action.
 - Do not expose API keys, tokens, or secrets in titles, messages, action URLs, or webhook bodies.
 - If a command fails, report the error and do not retry repeatedly without a change.

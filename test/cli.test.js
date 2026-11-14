@@ -429,26 +429,38 @@ test("push still requires a title when sending", async () => {
 
 // Runs the CLI with a fake API that answers every request with `response` and records the requests.
 // Tests run inside coding agents too; clear their markers so requests stay predictable.
+const cliUrl = new URL("../src/cli.js", import.meta.url).href;
 const withoutAgentEnv = (env) => Object.fromEntries(Object.entries(env).filter(([key]) => !AGENT_ENV_VARS.includes(key)));
 
-const runCliWithApi = (args, { response, env = {} }) =>
+// `routes` maps a URL path suffix to its response; other requests get `response`.
+const runCliWithApi = (args, { response, routes = {}, env = {}, cwd = process.cwd() }) =>
   new Promise((resolve, reject) => {
     const runner = `
+      const routes = JSON.parse(process.env.CLI_TEST_ROUTES);
       globalThis.fetch = async (url, init) => {
+        const raw = init.body && typeof init.body !== "string";
         process.stdout.write("CAPTURE:" + JSON.stringify({
           url,
           method: init.method,
           headers: init.headers,
-          body: init.body ? JSON.parse(init.body) : null
+          body: raw ? { bytes: init.body.length } : init.body ? JSON.parse(init.body) : null
         }) + "\\n");
-        return new Response(process.env.CLI_TEST_RESPONSE, { status: 200, headers: { "Content-Type": "application/json" } });
+        const route = Object.keys(routes).find((suffix) => new URL(url).pathname.endsWith(suffix));
+        const body = route ? JSON.stringify(routes[route]) : process.env.CLI_TEST_RESPONSE;
+        return new Response(body, { status: 200, headers: { "Content-Type": "application/json" } });
       };
       process.argv = ["node", "activitysmith", ...JSON.parse(process.env.CLI_TEST_ARGS)];
-      await import("./src/cli.js");
+      await import(${JSON.stringify(cliUrl)});
     `;
     const child = spawn(process.execPath, ["--input-type=module", "--eval", runner], {
-      cwd: process.cwd(),
-      env: { ...withoutAgentEnv(process.env), ...env, CLI_TEST_ARGS: JSON.stringify(args), CLI_TEST_RESPONSE: JSON.stringify(response) },
+      cwd,
+      env: {
+        ...withoutAgentEnv(process.env),
+        ...env,
+        CLI_TEST_ARGS: JSON.stringify(args),
+        CLI_TEST_RESPONSE: JSON.stringify(response),
+        CLI_TEST_ROUTES: JSON.stringify(routes),
+      },
     });
     let stdout = "";
     let stderr = "";
@@ -550,12 +562,11 @@ test("approval request sends the question and context, then exits 0 when approve
     details: "Draft: pricing-update.md",
     execution_context: { tool: "shell", command: "node scripts/send-pricing-email.js" },
     scope: { type: "working_directory", value: process.cwd() },
-    delivery: "auto",
     approve_label: "Send",
     reject_label: "Don't Send",
-    appearance: { badge: { title: "Email" } },
     target_channel_slugs: ["ops", "founders"],
   });
+  assert.match(result.stderr, /Ignoring --badge: approvals are always Push Notifications/);
   assert.equal(wait.url, "https://activitysmith.com/api/approvals/apr_1?wait=45");
   assert.equal(wait.method, "GET");
   assert.match(result.stderr, /Waiting for the decision on the iPhone\. Approval ID: apr_1/);
@@ -612,7 +623,7 @@ test("approval request exits 1 when the request is rejected, timed out, or cance
     const result = await runCliWithApi(["--api-key", "test", "approval", "request", "Deploy?"], { response: approvalResponse(status) });
     assert.equal(result.code, 1, status);
     assert.match(result.stdout, line);
-    assert.deepEqual(result.requests[0].body, { question: "Deploy?", delivery: "auto", approve_label: "Approve", reject_label: "Reject" });
+    assert.deepEqual(result.requests[0].body, { question: "Deploy?", approve_label: "Approve", reject_label: "Reject" });
   }
 });
 
@@ -630,18 +641,169 @@ test("approval request exits 3 while still pending after --timeout or with --no-
 });
 
 test("approval request validates options before sending", async () => {
-  for (const extra of [["--scope", "planet:mars"], ["--color", "teal"], ["--timeout", "0"], ["--delivery", "email"]]) {
+  for (const extra of [
+    ["--scope", "planet:mars"],
+    ["--timeout", "0"],
+    ["--option", "Only one"],
+    ["--option", "A", "--option", "B", "--option", "C", "--option", "D", "--option", "E"],
+    ["--option", "x=A", "--option", "x=B"],
+    ["--option", "A", "--option", "B", "--recommended", "z"],
+    ["--recommended", "a"],
+    ["--option", "A", "--option", "B", "--option-screenshot", "z=shot.png"],
+    ["--option", "A", "--option", "B", "--option-screenshot", "a"],
+    ["--option", `a=${"x".repeat(81)}`, "--option", "b"],
+    ["--link", "Docs=http://example.com"],
+    ["--link", "not a url"],
+    ["--change", "src/app.ts:12"],
+    ["--screenshot", "missing.png"],
+    Array.from({ length: 6 }, (_, i) => ["--link", `https://example.com/${i}`]).flat(),
+  ]) {
     const result = await runCliWithApi(["--api-key", "test", "approval", "request", "Deploy?", ...extra], { response: approvalResponse("approved") });
-    assert.notEqual(result.code, 0, extra.join(" "));
-    assert.equal(result.requests.length, 0);
+    assert.equal(result.code, 2, extra.join(" "));
+    assert.equal(result.requests.length, 0, extra.join(" "));
   }
+  // Deprecated appearance flags are accepted, ignored, and never sent.
   const scoped = await runCliWithApi(
-    ["--api-key", "test", "approval", "request", "Deploy?", "--scope", "environment:production", "--color", "red", "--delivery", "push_notification"],
+    ["--api-key", "test", "approval", "request", "Deploy?", "--scope", "environment:production", "--color", "teal", "--delivery", "live_activity", "--icon", "bolt"],
     { response: approvalResponse("approved") }
   );
+  assert.equal(scoped.code, 0, scoped.stderr);
   assert.deepEqual(scoped.requests[0].body.scope, { type: "environment", value: "production" });
-  assert.deepEqual(scoped.requests[0].body.appearance, { color: "red" });
-  assert.equal(scoped.requests[0].body.delivery, "push_notification");
+  assert.equal("appearance" in scoped.requests[0].body, false);
+  assert.equal("delivery" in scoped.requests[0].body, false);
+  assert.match(scoped.stderr, /Ignoring --delivery, --color, --icon/);
+});
+
+test("approval request prints the reply and exits 4", async () => {
+  const response = { approval: { ...approvalResponse("replied").approval, reply: "Send it tomorrow at 9 instead.\nSkip the EU list." } };
+  for (const command of [["request", "Send the email?"], ["wait", "apr_1"]]) {
+    const result = await runCliWithApi(["--api-key", "test", "approval", ...command], { response });
+    assert.equal(result.code, 4, result.stderr);
+    assert.equal(
+      result.stdout,
+      "Replied. Read the reply and follow it. Do not run the original action unless the reply says to.\nReply:\nSend it tomorrow at 9 instead.\nSkip the EU list."
+    );
+  }
+  const json = await runCliWithApi(["--api-key", "test", "--json", "approval", "wait", "apr_1"], { response });
+  assert.equal(json.code, 4);
+  assert.equal(JSON.parse(json.stdout).approval.reply, "Send it tomorrow at 9 instead.\nSkip the EU list.");
+});
+
+test("approval request sends options and prints the chosen option with exit 5", async () => {
+  const options = [
+    { id: "left", label: "Keep the left layout" },
+    { id: "right", label: "Use the right layout", recommended: true },
+  ];
+  const chosen = {
+    approval: { ...approvalResponse("chosen").approval, options, selected_option_id: "right", selected_option: options[1] },
+  };
+  const result = await runCliWithApi(
+    ["--api-key", "test", "approval", "request", "Which layout?", "--option", "left=Keep the left layout", "--option", "right=Use the right layout", "--recommended", "right"],
+    { response: chosen }
+  );
+  assert.equal(result.code, 5, result.stderr);
+  assert.deepEqual(result.requests[0].body.options, options);
+  assert.equal(result.stdout, "Chosen: Use the right layout\nOption ID: right\nDo the chosen option.");
+
+  const defaultIds = await runCliWithApi(
+    ["--api-key", "test", "approval", "request", "Retry?", "--option", "Retry the failed jobs", "--option", "Skip them", "--option", "Stop the run"],
+    { response: chosen }
+  );
+  assert.deepEqual(defaultIds.requests[0].body.options.map((option) => option.id), ["a", "b", "c"]);
+
+  const got = await runCliWithApi(["--api-key", "test", "approval", "get", "apr_1"], { response: chosen });
+  assert.equal(got.code, 0);
+  assert.match(got.stdout, /^Chosen: Use the right layout\nOption ID: right/);
+});
+
+test("approval request uploads screenshots once and references their IDs", async () => {
+  const { mkdtemp, writeFile } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const dir = await mkdtemp(join(tmpdir(), "activitysmith-cli-shots-"));
+  const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(32)]);
+  const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(32)]);
+  await writeFile(join(dir, "left.png"), png);
+  await writeFile(join(dir, "right.jpg"), jpeg);
+  await writeFile(join(dir, "fake.png"), "not an image");
+  await writeFile(join(dir, "big.png"), Buffer.concat([png, Buffer.alloc(2 * 1024 * 1024)]));
+
+  const result = await runCliWithApi(
+    [
+      "--api-key", "test", "approval", "request", "Which layout?",
+      "--screenshot", "left.png=Left layout",
+      "--option", "left=Left", "--option", "right=Right",
+      "--option-screenshot", "left=left.png", "--option-screenshot", "right=right.jpg",
+    ],
+    { cwd: dir, response: approvalResponse("approved"), routes: { "/approvals/screenshots": { screenshot: { id: "scr_1" } } } }
+  );
+  assert.equal(result.code, 0, result.stderr);
+  const uploads = result.requests.filter((request) => request.url.endsWith("/approvals/screenshots"));
+  assert.equal(uploads.length, 2);
+  assert.equal(uploads[0].headers["Content-Type"], "image/png");
+  assert.equal(uploads[0].body.bytes, png.length);
+  assert.equal(uploads[1].headers["Content-Type"], "image/jpeg");
+  const create = result.requests.find((request) => request.url.endsWith("/approvals"));
+  assert.deepEqual(create.body.screenshots, [{ id: "scr_1", title: "Left layout" }, { id: "scr_1" }]);
+  assert.deepEqual(create.body.options, [
+    { id: "left", label: "Left", screenshot_id: "scr_1" },
+    { id: "right", label: "Right", screenshot_id: "scr_1" },
+  ]);
+
+  for (const file of ["fake.png", "big.png"]) {
+    const rejected = await runCliWithApi(["--api-key", "test", "approval", "request", "Ship?", "--screenshot", file], {
+      cwd: dir,
+      response: approvalResponse("approved"),
+    });
+    assert.equal(rejected.code, 2, file);
+    assert.equal(rejected.requests.length, 0, file);
+  }
+});
+
+test("approval request sends changes from git and --change, and links", async () => {
+  const { mkdtemp, writeFile } = await import("node:fs/promises");
+  const { execFileSync } = await import("node:child_process");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const dir = await mkdtemp(join(tmpdir(), "activitysmith-cli-git-"));
+  const git = (...args) => execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@example.com", ...args], { cwd: dir });
+  git("init", "-q");
+  await writeFile(join(dir, "app.ts"), "one\ntwo\nthree\n");
+  git("add", ".");
+  git("commit", "-qm", "init");
+  await writeFile(join(dir, "app.ts"), "one\n2\nthree\nfour\n");
+  await writeFile(join(dir, "new file.md"), "hello\n");
+  git("add", "new file.md");
+
+  const result = await runCliWithApi(
+    [
+      "--api-key", "test", "approval", "request", "Commit these changes?", "--git-changes",
+      "--change", "C:/build/out.js:3:0",
+      "--link", "Pull request=https://github.com/acme/app/pull/42?tab=files",
+      "--link", "https://staging.example.com",
+    ],
+    { cwd: dir, response: approvalResponse("approved") }
+  );
+  assert.equal(result.code, 0, result.stderr);
+  assert.deepEqual(result.requests[0].body.changes, {
+    files: [
+      { path: "app.ts", added: 2, removed: 1 },
+      { path: "new file.md", added: 1, removed: 0 },
+      { path: "C:/build/out.js", added: 3, removed: 0 },
+    ],
+  });
+  assert.deepEqual(result.requests[0].body.links, [
+    { title: "Pull request", url: "https://github.com/acme/app/pull/42?tab=files" },
+    { title: "https://staging.example.com", url: "https://staging.example.com" },
+  ]);
+
+  const outside = await runCliWithApi(["--api-key", "test", "approval", "request", "Ship?", "--git-changes", "main...nope"], {
+    cwd: dir,
+    response: approvalResponse("approved"),
+  });
+  assert.equal(outside.code, 2);
+  assert.equal(outside.requests.length, 0);
+  assert.match(outside.stderr, /Could not read changes with git/);
 });
 
 test("approval wait, get, and cancel use the approval ID", async () => {
