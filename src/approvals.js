@@ -7,8 +7,10 @@ export const APPROVAL_LIMITS = {
   minOptions: 2,
   maxOptions: 4,
   optionLabel: 80,
-  maxChangedFiles: 200,
-  changedFilePath: 500,
+  maxTopFiles: 2,
+  topFileName: 500,
+  maxFilesChanged: 1_000_000,
+  maxChangedLines: 1_000_000_000,
   maxLinks: 5,
   linkTitle: 120,
   linkUrl: 2000,
@@ -133,19 +135,29 @@ export const readGitChanges = async (range, { cwd = process.cwd() } = {}) => {
   }
 };
 
-// Keeps the most changed files when there are more than the API accepts.
+// The name the review screen shows: the last path component. Full paths never leave the machine.
+export const changedFileName = (path) => {
+  const trimmed = path.trim().replace(/[\\/]+$/, "");
+  const name = trimmed.slice(Math.max(trimmed.lastIndexOf("/"), trimmed.lastIndexOf("\\")) + 1) || trimmed;
+  return name.slice(0, APPROVAL_LIMITS.topFileName);
+};
+
+// Reduces changed files to what the review screen shows: the file count, the line totals, and the
+// names of the 2 most changed files (added plus removed). Returns undefined when nothing changed.
 export const buildApprovalChanges = (files) => {
-  if (files.length === 0) return { changes: undefined, omitted: 0 };
-  for (const file of files) {
-    if (file.path.length > APPROVAL_LIMITS.changedFilePath) {
-      throw new Error(`Changed file path is longer than ${APPROVAL_LIMITS.changedFilePath} characters: ${file.path.slice(0, 80)}...`);
-    }
-  }
-  const kept =
-    files.length > APPROVAL_LIMITS.maxChangedFiles
-      ? [...files].sort((a, b) => b.added + b.removed - (a.added + a.removed)).slice(0, APPROVAL_LIMITS.maxChangedFiles)
-      : files;
-  return { changes: { files: kept }, omitted: files.length - kept.length };
+  const changed = files.filter((file) => file.path && file.path.trim());
+  if (changed.length === 0) return undefined;
+  // Array sort is stable, so files with the same line count keep their order.
+  const topFiles = [...changed]
+    .sort((a, b) => b.added + b.removed - (a.added + a.removed))
+    .slice(0, APPROVAL_LIMITS.maxTopFiles)
+    .map((file) => changedFileName(file.path));
+  return {
+    files_changed: Math.min(APPROVAL_LIMITS.maxFilesChanged, changed.length),
+    lines_added: Math.min(APPROVAL_LIMITS.maxChangedLines, changed.reduce((total, file) => total + file.added, 0)),
+    lines_removed: Math.min(APPROVAL_LIMITS.maxChangedLines, changed.reduce((total, file) => total + file.removed, 0)),
+    top_files: topFiles,
+  };
 };
 
 // Reads the type from the file signature, as the API does, so a renamed file fails before upload.

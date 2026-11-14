@@ -2087,9 +2087,9 @@ approvalCommand
   )
   .option(
     "--git-changes [range]",
-    "Show the changed files and line counts from git diff: uncommitted changes, or a range such as main...HEAD"
+    "Show the file count, line totals, and the 2 most changed file names from git diff: uncommitted changes, or a range such as main...HEAD"
   )
-  .option("--change <path:added:removed>", "A changed file and its line counts, such as src/app.ts:12:3. Repeatable", repeatable(parseChangeArgument))
+  .option("--change <path:added:removed>", "A changed file and its line counts, such as src/app.ts:12:3. Repeatable. Adds to the same summary", repeatable(parseChangeArgument))
   .option("--link <[title=]url>", "An https link to open from the review screen, such as a pull request. Repeatable, 5 at most", repeatable(parseLinkArgument))
   .option("--channels <slugs>", "Comma-separated channel slugs. Omit to ask on every paired device")
   .option("--timeout <seconds>", "Stop waiting after this many seconds and exit 3 if still pending", parsePositiveSeconds)
@@ -2124,10 +2124,7 @@ approvalCommand
         ...(options.gitChanges !== undefined ? await readGitChanges(options.gitChanges) : []),
         ...(options.change ?? []),
       ];
-      const { changes, omitted } = buildApprovalChanges(changedFiles);
-      if (omitted > 0 && !globalOptions.json) {
-        console.error(`Showing the ${APPROVAL_LIMITS.maxChangedFiles} most changed files. ${omitted} more are left out.`);
-      }
+      const changes = buildApprovalChanges(changedFiles);
       const channels = String(options.channels ?? "")
         .split(",")
         .map((slug) => slug.trim())

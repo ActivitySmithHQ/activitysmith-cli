@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { approvalResultLines, buildApprovalChanges, parseGitNumstat, parseLinkArgument, parseOptionArgument } from "../src/approvals.js";
+import { approvalResultLines, buildApprovalChanges, changedFileName, parseGitNumstat, parseLinkArgument, parseOptionArgument } from "../src/approvals.js";
 
 test("parseGitNumstat reads binary files as zero lines and keeps tabs in paths", () => {
   assert.deepEqual(parseGitNumstat("3\t1\tsrc/app.ts\0-\t-\tlogo.png\0" + "2\t0\tdocs/a\tb.md\0"), [
@@ -11,13 +11,34 @@ test("parseGitNumstat reads binary files as zero lines and keeps tabs in paths",
   assert.deepEqual(parseGitNumstat(""), []);
 });
 
-test("buildApprovalChanges keeps the 200 most changed files", () => {
-  const files = Array.from({ length: 205 }, (_, i) => ({ path: `f${i}`, added: i, removed: 0 }));
-  const { changes, omitted } = buildApprovalChanges(files);
-  assert.equal(changes.files.length, 200);
-  assert.equal(omitted, 5);
-  assert.equal(changes.files.some((file) => file.path === "f0"), false);
-  assert.deepEqual(buildApprovalChanges([]), { changes: undefined, omitted: 0 });
+test("buildApprovalChanges sends only the counts and the 2 most changed file names", () => {
+  const files = [
+    { path: "docs/readme.md", added: 1, removed: 0 },
+    { path: "src/billing/seatCount.ts", added: 40, removed: 12 },
+    { path: "assets/logo.png", added: 0, removed: 0 },
+    { path: "src/api/routes.ts", added: 5, removed: 5 },
+    { path: "C:\\build\\out.js", added: 10, removed: 0 },
+  ];
+  assert.deepEqual(buildApprovalChanges(files), {
+    files_changed: 5,
+    lines_added: 56,
+    lines_removed: 17,
+    top_files: ["seatCount.ts", "routes.ts"],
+  });
+  assert.deepEqual(buildApprovalChanges([{ path: "a/one.ts", added: 2, removed: 0 }]), {
+    files_changed: 1,
+    lines_added: 2,
+    lines_removed: 0,
+    top_files: ["one.ts"],
+  });
+  assert.equal(buildApprovalChanges([]), undefined);
+});
+
+test("changedFileName keeps only the last path component", () => {
+  assert.equal(changedFileName("src/app.ts"), "app.ts");
+  assert.equal(changedFileName("C:\\build\\out.js"), "out.js");
+  assert.equal(changedFileName("Makefile"), "Makefile");
+  assert.equal(changedFileName("vendor/lib/"), "lib");
 });
 
 test("parseOptionArgument takes an ID only when it is a valid one", () => {

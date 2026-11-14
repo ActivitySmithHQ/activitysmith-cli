@@ -757,8 +757,8 @@ activitysmith approval request "Deploy the new checkout to production?" \
   --screenshot "shots/checkout.png=New checkout"
 ```
 
-- `--git-changes` adds each changed file with its added and removed line counts from `git diff`. Without a range, it uses the uncommitted changes. File contents are never sent.
-- `--change <path:added:removed>` adds one file by hand, such as `src/app.ts:12:3`.
+- `--git-changes` adds a summary of `git diff`: how many files changed, the lines added and removed, and the 2 most changed files. Without a range, it uses the uncommitted changes.
+- `--change <path:added:removed>` adds one file by hand, such as `src/app.ts:12:3`. Repeat it to add more files. Each file adds to the same summary.
 - `--link <title=url>` adds an https link that opens in the app. Add up to 5.
 - `--screenshot <file=title>` uploads a PNG, JPEG, or WebP file of up to 2 MB. The title is optional. Add up to 5.
 

@@ -768,12 +768,15 @@ test("approval request sends changes from git and --change, and links", async ()
   const dir = await mkdtemp(join(tmpdir(), "activitysmith-cli-git-"));
   const git = (...args) => execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@example.com", ...args], { cwd: dir });
   git("init", "-q");
-  await writeFile(join(dir, "app.ts"), "one\ntwo\nthree\n");
+  const { mkdir } = await import("node:fs/promises");
+  await mkdir(join(dir, "src", "billing"), { recursive: true });
+  await writeFile(join(dir, "src", "billing", "app.ts"), "one\ntwo\nthree\n");
   git("add", ".");
   git("commit", "-qm", "init");
-  await writeFile(join(dir, "app.ts"), "one\n2\nthree\nfour\n");
+  await writeFile(join(dir, "src", "billing", "app.ts"), "one\n2\nthree\nfour\n");
   await writeFile(join(dir, "new file.md"), "hello\n");
-  git("add", "new file.md");
+  await writeFile(join(dir, "logo.png"), Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 0, 0, 1, 2, 3]));
+  git("add", "new file.md", "logo.png");
 
   const result = await runCliWithApi(
     [
@@ -785,13 +788,14 @@ test("approval request sends changes from git and --change, and links", async ()
     { cwd: dir, response: approvalResponse("approved") }
   );
   assert.equal(result.code, 0, result.stderr);
+  // Only the summary leaves the machine: no paths, no per-file list.
   assert.deepEqual(result.requests[0].body.changes, {
-    files: [
-      { path: "app.ts", added: 2, removed: 1 },
-      { path: "new file.md", added: 1, removed: 0 },
-      { path: "C:/build/out.js", added: 3, removed: 0 },
-    ],
+    files_changed: 4,
+    lines_added: 6,
+    lines_removed: 1,
+    top_files: ["app.ts", "out.js"],
   });
+  assert.doesNotMatch(JSON.stringify(result.requests[0].body), /src\/billing|C:\/build/);
   assert.deepEqual(result.requests[0].body.links, [
     { title: "Pull request", url: "https://github.com/acme/app/pull/42?tab=files" },
     { title: "https://staging.example.com", url: "https://staging.example.com" },
@@ -804,6 +808,26 @@ test("approval request sends changes from git and --change, and links", async ()
   assert.equal(outside.code, 2);
   assert.equal(outside.requests.length, 0);
   assert.match(outside.stderr, /Could not read changes with git/);
+});
+
+test("approval request sends no changes when git has none", async () => {
+  const { mkdtemp, writeFile } = await import("node:fs/promises");
+  const { execFileSync } = await import("node:child_process");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const dir = await mkdtemp(join(tmpdir(), "activitysmith-cli-git-"));
+  const git = (...args) => execFileSync("git", ["-c", "user.name=Test", "-c", "user.email=test@example.com", ...args], { cwd: dir });
+  git("init", "-q");
+  await writeFile(join(dir, "app.ts"), "one\n");
+  git("add", ".");
+  git("commit", "-qm", "init");
+
+  const result = await runCliWithApi(["--api-key", "test", "approval", "request", "Ship?", "--git-changes"], {
+    cwd: dir,
+    response: approvalResponse("approved"),
+  });
+  assert.equal(result.code, 0, result.stderr);
+  assert.equal("changes" in result.requests[0].body, false);
 });
 
 test("approval wait, get, and cancel use the approval ID", async () => {
