@@ -1,3 +1,7 @@
+## 1.20.0
+
+New and improved approvals. Your agent can now show you more before you decide, like screenshots, changed files, and links, and you can answer with more than yes or no. Pick one of several options, or write a reply, and the agent gets your answer right away.
+
 ## 1.19.0
 
 Push Notifications and approval requests now name the coding agent that runs the CLI. From Claude Code, Codex, or Cursor, a Push Notification without `--icon` shows that agent's icon, and an approval arrives as "Claude Code needs your approval" with the Claude icon instead of "ActivitySmith CLI". The CLI reads the agent from the environment it sets and sends it as the `X-ActivitySmith-Agent` header. Commands run from a plain terminal send nothing new.
