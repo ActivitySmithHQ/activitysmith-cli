@@ -135,7 +135,7 @@ export const readGitChanges = async (range, { cwd = process.cwd() } = {}) => {
   }
 };
 
-// The name the review screen shows: the last path component. Full paths never leave the machine.
+// The name the review screen shows: the last path component.
 export const changedFileName = (path) => {
   const trimmed = path.trim().replace(/[\\/]+$/, "");
   const name = trimmed.slice(Math.max(trimmed.lastIndexOf("/"), trimmed.lastIndexOf("\\")) + 1) || trimmed;

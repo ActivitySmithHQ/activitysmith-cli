@@ -788,7 +788,7 @@ test("approval request sends changes from git and --change, and links", async ()
     { cwd: dir, response: approvalResponse("approved") }
   );
   assert.equal(result.code, 0, result.stderr);
-  // Only the summary leaves the machine: no paths, no per-file list.
+  // The request has only the summary: the counts and the 2 file names.
   assert.deepEqual(result.requests[0].body.changes, {
     files_changed: 4,
     lines_added: 6,
