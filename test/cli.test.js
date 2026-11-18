@@ -376,6 +376,46 @@ test('push rejects invalid interruption levels and non-HTTPS icons before transp
   }
 });
 
+const soundCommands = [
+  ["push", "--title", "Deploy finished"],
+  ["activity", "start", "--title", "Deploy", "--type", "progress", "--percentage", "20"],
+  ["activity", "update", "--activity-id", "a", "--title", "Deploy", "--percentage", "50"],
+  ["activity", "end", "--activity-id", "a", "--title", "Deploy", "--percentage", "100"],
+  ["activity", "stream", "deploy", "--title", "Deploy", "--type", "progress", "--percentage", "50"],
+  ["activity", "end-stream", "deploy"],
+];
+for (const args of soundCommands) {
+  const name = args.slice(0, 2).join(" ");
+  for (const sound of ["chime", "default", "none", "legacy-sound"]) {
+    test(`${name} sends --sound ${sound}`, async () => {
+      const result = await runCli([...args, "--sound", sound]);
+      assert.equal(result.code, 0, result.stdout + result.stderr);
+      assert.equal(result.request.body.sound, sound);
+      assert.equal(result.request.body.content_state?.sound, undefined);
+    });
+  }
+  test(`${name} omits sound by default`, async () => {
+    const result = await runCli(args);
+    assert.equal(result.code, 0, result.stdout + result.stderr);
+    assert.equal(Object.hasOwn(result.request.body ?? {}, "sound"), false);
+  });
+  test(`${name} rejects an empty or too long --sound before sending`, async () => {
+    for (const sound of ["", "  ", "x".repeat(51)]) {
+      const result = await runCli([...args, "--sound", sound]);
+      assert.notEqual(result.code, 0);
+      assert.equal(result.request, null);
+      assert.match(result.stdout + result.stderr, /sound must be 1-50 characters/);
+    }
+  });
+}
+
+test("end-stream with only --sound sends just the sound", async () => {
+  const result = await runCli(["activity", "end-stream", "deploy", "--sound", "bell"]);
+  assert.equal(result.code, 0, result.stdout + result.stderr);
+  assert.equal(result.request.method, "DELETE");
+  assert.deepEqual(result.request.body, { sound: "bell" });
+});
+
 test("push --replace silently replaces a sent push notification", async () => {
   const result = await runCli([
     "push",
@@ -397,7 +437,7 @@ test("push --replace silently replaces a sent push notification", async () => {
 });
 
 test("push --replace rejects options that only apply to new sends", async () => {
-  for (const extra of [["--channels", "ops"], ["--interruption-level", "passive"]]) {
+  for (const extra of [["--channels", "ops"], ["--interruption-level", "passive"], ["--sound", "chime"]]) {
     const result = await runCli(["push", "--replace", "pn-1", "--title", "Done", ...extra]);
 
     assert.notEqual(result.code, 0);
