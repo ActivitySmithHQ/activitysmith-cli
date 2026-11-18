@@ -279,6 +279,25 @@ activitysmith push \
   --interruption-level "time-sensitive"
 ```
 
+### Push Notification Sounds
+
+Use `--sound` to choose the sound a Push Notification plays. Omit it to play the Push Notifications sound picked in the ActivitySmith app under Settings > Sounds.
+
+| Value | Behavior |
+| --- | --- |
+| `default` | Plays the sound picked on the device. This is the same as omitting `--sound`. |
+| `none` | Plays no sound. |
+| A sound name | Plays one of the sounds bundled with the app: `arrive`, `bell`, `bells`, `bitflip`, `bloom`, `callout`, `chime`, `coin`, `corrupt`, `crest`, `cue`, `ding`, `drop`, `ember`, `emblem`, `flourish`, `glimmer`, `glint`, `glitch`, `lantern`, `nightfall`, `nudge`, `pixel`, `pop`, `signal`, `streak`, `tally`, `wand`, `whoosh`, or `zip`. |
+
+Passive Push Notifications play no sound.
+
+```bash
+activitysmith push \
+  --title "💸 New sale" \
+  --message "Pro plan, \$29/month" \
+  --sound "coin"
+```
+
 ### Replace a Push Notification
 
 Every `push` prints a `Notification ID`. Pass it to `--replace` to update a Push Notification you already sent, for example when an incident you alerted on is resolved. The replacement takes the old notification's place on the Lock Screen and in history instead of stacking a second one. It arrives silently, without sound or waking the screen, and goes to the same recipients as the original, so `--channels` and `--interruption-level` don't apply.
@@ -649,6 +668,23 @@ activitysmith activity stream agent-approval \
       "decision": "deny"
     }
   }'
+```
+
+### Live Activity Sounds
+
+Starting a Live Activity plays the Live Activities sound picked in the ActivitySmith app. Updates and ends are silent. Set `--sound` on a start, update, or end to choose its sound, with the same values as [Push Notification Sounds](#push-notification-sounds). A sound on an update or end also expands the Live Activity on the Lock Screen, so use it for moments that need attention, such as a failed step.
+
+```bash
+activitysmith activity stream deploy-api \
+  --content-state '{
+    "title": "Deploying API",
+    "subtitle": "Step 3 failed",
+    "type": "segmented_progress",
+    "numberOfSteps": 4,
+    "currentStep": 3,
+    "color": "red"
+  }' \
+  --sound "glitch"
 ```
 
 ## Lock Screen Widgets
