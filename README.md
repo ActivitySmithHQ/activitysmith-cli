@@ -495,6 +495,19 @@ For a countdown, send `durationSeconds`. Leave it out on later stream updates to
 
 To start at 00:00 and count up, set `countsDown` to `false` and leave out `durationSeconds`.
 
+To count down to a set time, send `timerEndAt` instead of `durationSeconds`. If the timer started earlier, also send `timerStartAt`. The progress bar then shows the time already gone.
+
+```bash
+activitysmith activity stream nightly-backup \
+  --content-state '{
+    "title": "Nightly Backup",
+    "subtitle": "uploading archive",
+    "type": "timer",
+    "timerStartAt": "2026-11-19T01:00:00Z",
+    "timerEndAt": "2026-11-19T02:00:00Z"
+  }'
+```
+
 ### End Live Activity
 
 Call `activity end-stream` with the same `stream_key` to dismiss the Live Activity. You can include final values before it is removed. Use `--auto-dismiss-seconds` or `--auto-dismiss-minutes` to delay dismissal. Use `0` for immediate dismissal. Seconds take precedence if both are set. JSON content state also accepts `autoDismissSeconds` or `auto_dismiss_seconds`.
