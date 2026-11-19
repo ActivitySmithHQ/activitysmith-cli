@@ -208,6 +208,59 @@ test("new countdown still requires a duration", async () => {
   assert.equal(result.request, null);
 });
 
+for (const mode of ["stream", "start"]) {
+  test(`timer ${mode} sends timer start and end dates`, async () => {
+    const args = ["activity", mode];
+    if (mode === "stream") args.push("job");
+    args.push("--title", "Job", "--type", "timer",
+      "--timer-start-at", "2026-11-19T10:00:00+07:00",
+      "--timer-end-at", "2026-11-19T03:30:00Z");
+    const result = await runCli(args);
+    assert.equal(result.code, 0, result.stderr);
+    const state = result.request.body.content_state;
+    assert.equal(state.timer_start_at, "2026-11-19T03:00:00.000Z");
+    assert.equal(state.timer_end_at, "2026-11-19T03:30:00.000Z");
+    assert.equal(state.timerStartAt, undefined);
+    assert.equal(state.timerEndAt, undefined);
+    assert.equal(state.duration_seconds, undefined);
+  });
+}
+
+test("timer end date alone satisfies a new countdown", async () => {
+  const result = await runCli(["activity", "start", "--title", "Job", "--type", "timer",
+    "--timer-end-at", "2026-11-19T03:30:00Z"]);
+  assert.equal(result.code, 0, result.stderr);
+  assert.equal(result.request.body.content_state.timer_end_at, "2026-11-19T03:30:00.000Z");
+});
+
+test("content state JSON accepts camelCase timer dates", async () => {
+  const result = await runCli(["activity", "start", "--content-state", JSON.stringify({
+    title: "Job", type: "timer", timerStartAt: "2026-11-19T03:00:00Z", timerEndAt: "2026-11-19T03:30:00Z" })]);
+  assert.equal(result.code, 0, result.stderr);
+  assert.equal(result.request.body.content_state.timer_start_at, "2026-11-19T03:00:00.000Z");
+  assert.equal(result.request.body.content_state.timer_end_at, "2026-11-19T03:30:00.000Z");
+});
+
+test("rejects duration seconds with a timer end date", async () => {
+  const result = await runCli(["activity", "stream", "job", "--title", "Job", "--type", "timer",
+    "--duration-seconds", "60", "--timer-end-at", "2026-11-19T03:30:00Z"]);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stdout + result.stderr, /durationSeconds or contentState\.timerEndAt, not both/);
+  assert.equal(result.request, null);
+});
+
+for (const [form, args] of [
+  ["flag", ["--title", "Job", "--type", "timer", "--timer-end-at", "not-a-date"]],
+  ["JSON", ["--content-state", JSON.stringify({ title: "Job", type: "timer", timerStartAt: "soon" })]],
+]) {
+  test(`rejects an invalid timer date via ${form}`, async () => {
+    const result = await runCli(["activity", "stream", "job", ...args]);
+    assert.notEqual(result.code, 0);
+    assert.match(result.stdout + result.stderr, /must be an ISO 8601 date-time/);
+    assert.equal(result.request, null);
+  });
+}
+
 test("rejects negative dismissal seconds before sending", async () => {
   const result = await runCli(["activity", "end-stream", "job", "--title", "Done",
     "--type", "timer", "--auto-dismiss-seconds", "-1"]);
@@ -376,6 +429,46 @@ test('push rejects invalid interruption levels and non-HTTPS icons before transp
   }
 });
 
+const soundCommands = [
+  ["push", "--title", "Deploy finished"],
+  ["activity", "start", "--title", "Deploy", "--type", "progress", "--percentage", "20"],
+  ["activity", "update", "--activity-id", "a", "--title", "Deploy", "--percentage", "50"],
+  ["activity", "end", "--activity-id", "a", "--title", "Deploy", "--percentage", "100"],
+  ["activity", "stream", "deploy", "--title", "Deploy", "--type", "progress", "--percentage", "50"],
+  ["activity", "end-stream", "deploy"],
+];
+for (const args of soundCommands) {
+  const name = args.slice(0, 2).join(" ");
+  for (const sound of ["chime", "default", "none", "legacy-sound"]) {
+    test(`${name} sends --sound ${sound}`, async () => {
+      const result = await runCli([...args, "--sound", sound]);
+      assert.equal(result.code, 0, result.stdout + result.stderr);
+      assert.equal(result.request.body.sound, sound);
+      assert.equal(result.request.body.content_state?.sound, undefined);
+    });
+  }
+  test(`${name} omits sound by default`, async () => {
+    const result = await runCli(args);
+    assert.equal(result.code, 0, result.stdout + result.stderr);
+    assert.equal(Object.hasOwn(result.request.body ?? {}, "sound"), false);
+  });
+  test(`${name} rejects an empty or too long --sound before sending`, async () => {
+    for (const sound of ["", "  ", "x".repeat(51)]) {
+      const result = await runCli([...args, "--sound", sound]);
+      assert.notEqual(result.code, 0);
+      assert.equal(result.request, null);
+      assert.match(result.stdout + result.stderr, /sound must be 1-50 characters/);
+    }
+  });
+}
+
+test("end-stream with only --sound sends just the sound", async () => {
+  const result = await runCli(["activity", "end-stream", "deploy", "--sound", "bell"]);
+  assert.equal(result.code, 0, result.stdout + result.stderr);
+  assert.equal(result.request.method, "DELETE");
+  assert.deepEqual(result.request.body, { sound: "bell" });
+});
+
 test("push --replace silently replaces a sent push notification", async () => {
   const result = await runCli([
     "push",
@@ -397,7 +490,7 @@ test("push --replace silently replaces a sent push notification", async () => {
 });
 
 test("push --replace rejects options that only apply to new sends", async () => {
-  for (const extra of [["--channels", "ops"], ["--interruption-level", "passive"]]) {
+  for (const extra of [["--channels", "ops"], ["--interruption-level", "passive"], ["--sound", "chime"]]) {
     const result = await runCli(["push", "--replace", "pn-1", "--title", "Done", ...extra]);
 
     assert.notEqual(result.code, 0);

@@ -73,6 +73,13 @@ const parseNumberOption = (label) => (value) => {
   return parsed;
 };
 
+const parseDateOption = (label) => (value) => {
+  if (typeof value !== "string" || Number.isNaN(Date.parse(value))) {
+    throw new InvalidArgumentError(`${label} must be an ISO 8601 date-time`);
+  }
+  return new Date(value).toISOString();
+};
+
 const parseBooleanOption = (label) => (value) => {
   if (typeof value !== "string") {
     throw new InvalidArgumentError(`${label} must be true or false`);
@@ -122,6 +129,19 @@ const parseTagsOption = (value, previous = []) => {
 
   return [...previous, ...tags];
 };
+
+// The API also accepts sound names outside the bundled list, so only the length is checked here.
+const parseSoundOption = (value) => {
+  if (typeof value !== "string" || value.trim() === "" || value.length > 50) {
+    throw new InvalidArgumentError("sound must be 1-50 characters, such as chime, default, or none");
+  }
+  return value;
+};
+
+const SOUND_HELP = "Sound to play: a bundled sound name, default, or none";
+const LIVE_ACTIVITY_CHANGE_SOUND_HELP = `${SOUND_HELP}. Silent by default; a sound also expands the Live Activity on the Lock Screen`;
+
+const withSound = (request, sound) => (sound === undefined ? request : { ...request, sound });
 
 const parseMetricValueArgument = (value) => {
   if (typeof value !== "string") {
@@ -251,6 +271,16 @@ const addContentStateOptions = (command, { includeAutoDismiss, includeAutoDismis
       "--duration-seconds <number>",
       "Timer duration in seconds",
       parseNumberOption("duration-seconds")
+    )
+    .option(
+      "--timer-start-at <date>",
+      "Timer start time as an ISO 8601 date-time",
+      parseDateOption("timer-start-at")
+    )
+    .option(
+      "--timer-end-at <date>",
+      "Timer end time as an ISO 8601 date-time (instead of --duration-seconds)",
+      parseDateOption("timer-end-at")
     )
     .option(
       "--counts-down <boolean>",
@@ -442,7 +472,27 @@ const validateContentState = (contentState, mode) => {
   const hasMetrics = hasOwn(contentState, "metrics");
   const hasDurationSeconds = hasOwn(contentState, "durationSeconds");
   const hasCountsDown = hasOwn(contentState, "countsDown");
-  const hasTimerFields = hasDurationSeconds || hasCountsDown;
+  const hasTimerStartAt =
+    hasOwn(contentState, "timerStartAt") || hasOwn(contentState, "timer_start_at");
+  const hasTimerEndAt =
+    hasOwn(contentState, "timerEndAt") || hasOwn(contentState, "timer_end_at");
+  const hasTimerFields =
+    hasDurationSeconds || hasCountsDown || hasTimerStartAt || hasTimerEndAt;
+
+  for (const key of ["timerStartAt", "timer_start_at", "timerEndAt", "timer_end_at"]) {
+    if (!hasOwn(contentState, key)) continue;
+    const value = contentState[key];
+    if (typeof value !== "string" || Number.isNaN(Date.parse(value))) {
+      throw new Error(`contentState.${key} must be an ISO 8601 date-time`);
+    }
+    contentState[key] = new Date(value).toISOString();
+  }
+
+  if (hasDurationSeconds && hasTimerEndAt) {
+    throw new Error(
+      "Provide either contentState.durationSeconds or contentState.timerEndAt, not both"
+    );
+  }
 
   for (const key of ["autoDismissSeconds", "auto_dismiss_seconds"]) {
     if (hasOwn(contentState, key) &&
@@ -625,9 +675,14 @@ const validateContentState = (contentState, mode) => {
     }
 
     if (effectiveType === "timer") {
-      if (mode === "start" && !hasDurationSeconds && contentState.countsDown !== false) {
+      if (
+        mode === "start" &&
+        !hasDurationSeconds &&
+        !hasTimerEndAt &&
+        contentState.countsDown !== false
+      ) {
         throw new Error(
-          `timer ${mode} requires contentState.durationSeconds, or contentState.countsDown=false`
+          `timer ${mode} requires contentState.durationSeconds or contentState.timerEndAt, or contentState.countsDown=false`
         );
       }
       return;
@@ -908,6 +963,14 @@ const buildContentStateFromOptions = (options) => {
     contentState.durationSeconds = options.durationSeconds;
   }
 
+  if (options.timerStartAt !== undefined) {
+    contentState.timerStartAt = options.timerStartAt;
+  }
+
+  if (options.timerEndAt !== undefined) {
+    contentState.timerEndAt = options.timerEndAt;
+  }
+
   if (options.countsDown !== undefined) {
     contentState.countsDown = options.countsDown;
   }
@@ -957,6 +1020,8 @@ const toApiContentState = (contentState) => {
     autoDismissSeconds: "auto_dismiss_seconds",
     durationSeconds: "duration_seconds",
     countsDown: "counts_down",
+    timerStartAt: "timer_start_at",
+    timerEndAt: "timer_end_at",
   };
 
   const mapped = {};
@@ -1325,6 +1390,11 @@ const pushCommand = program
       "time-sensitive",
     ])
   )
+  .option(
+    "--sound <name>",
+    `${SOUND_HELP} (defaults to your Push Notifications sound)`,
+    parseSoundOption
+  )
   .option("--redirection <url>", "HTTPS or shortcuts:// URL opened when notification is tapped")
   .option("--actions <json>", "Actions JSON array (max 4)")
   .option("--actions-file <path>", "Path to actions JSON array file")
@@ -1356,9 +1426,13 @@ const pushCommand = program
         actions,
       });
       if (options.replace !== undefined) {
-        if (options.channels !== undefined || options.interruptionLevel !== undefined) {
+        if (
+          options.channels !== undefined ||
+          options.interruptionLevel !== undefined ||
+          options.sound !== undefined
+        ) {
           throw new Error(
-            "--channels and --interruption-level cannot be combined with --replace. Replacements go to the original recipients and arrive silently."
+            "--channels, --interruption-level, and --sound cannot be combined with --replace. Replacements go to the original recipients and arrive silently."
           );
         }
         if (options.replace.trim() === "") {
@@ -1380,6 +1454,7 @@ const pushCommand = program
               ? normalizeHttpsUrl(options.icon, "icon")
               : undefined,
           interruption_level: options.interruptionLevel,
+          sound: options.sound,
           redirection:
             options.redirection !== undefined
               ? normalizeOpenUrl(options.redirection, "redirection")
@@ -1567,6 +1642,11 @@ addLiveActivityActionOptions(addContentStateOptions(
       parseTagsOption
     )
     .option("--clear-tags", "Remove all Tags from this stream")
+    .option(
+      "--sound <name>",
+      `${SOUND_HELP}. A new stream defaults to your Live Activities sound; updates are silent by default, and a sound also expands the Live Activity on the Lock Screen`,
+      parseSoundOption
+    )
     .option("--metadata <json>", "Metadata JSON object shown in ActivitySmith details")
     .option("--metadata-file <path>", "Path to a Metadata JSON object file")
     .action(async (streamKey, options) => {
@@ -1584,17 +1664,20 @@ addLiveActivityActionOptions(addContentStateOptions(
 
         const response = await client.liveActivities.stream(
           streamKey,
-          withTags(
-            withTargetChannels(
-              toApiLiveActivityStreamRequest(
-                contentState,
-                action,
-                secondaryAction
+          withSound(
+            withTags(
+              withTargetChannels(
+                toApiLiveActivityStreamRequest(
+                  contentState,
+                  action,
+                  secondaryAction
+                ),
+                options.channels
               ),
-              options.channels
+              options.clearTags ? [] : options.tags,
+              await loadMetadata(options)
             ),
-            options.clearTags ? [] : options.tags,
-            await loadMetadata(options)
+            options.sound
           )
         );
 
@@ -1626,6 +1709,11 @@ addLiveActivityActionOptions(addContentStateOptions(
       "Comma-separated tags for organizing history (repeatable)",
       parseTagsOption
     )
+    .option(
+      "--sound <name>",
+      `${SOUND_HELP} (defaults to your Live Activities sound)`,
+      parseSoundOption
+    )
     .option("--metadata <json>", "Metadata JSON object shown in ActivitySmith details")
     .option("--metadata-file <path>", "Path to a Metadata JSON object file")
     .action(async (options) => {
@@ -1639,17 +1727,20 @@ addLiveActivityActionOptions(addContentStateOptions(
         const secondaryAction = await loadLiveActivitySecondaryAction(options);
 
         const response = await client.liveActivities.startLiveActivity({
-          liveActivityStartRequest: withTags(
-            withTargetChannels(
-              toApiLiveActivityStartRequest(
-                contentState,
-                action,
-                secondaryAction
+          liveActivityStartRequest: withSound(
+            withTags(
+              withTargetChannels(
+                toApiLiveActivityStartRequest(
+                  contentState,
+                  action,
+                  secondaryAction
+                ),
+                options.channels
               ),
-              options.channels
+              options.tags,
+              await loadMetadata(options)
             ),
-            options.tags,
-            await loadMetadata(options)
+            options.sound
           ),
         });
 
@@ -1671,6 +1762,7 @@ addLiveActivityActionOptions(addContentStateOptions(
     .requiredOption("--activity-id <id>", "Live Activity ID")
     .option("--tags <tags>", "Replace Tags for this Live Activity (repeatable)", parseTagsOption)
     .option("--clear-tags", "Remove all Tags from this Live Activity")
+    .option("--sound <name>", LIVE_ACTIVITY_CHANGE_SOUND_HELP, parseSoundOption)
     .option("--metadata <json>", "Metadata JSON object shown in ActivitySmith details")
     .option("--metadata-file <path>", "Path to a Metadata JSON object file")
     .action(async (options) => {
@@ -1687,12 +1779,12 @@ addLiveActivityActionOptions(addContentStateOptions(
         const secondaryAction = await loadLiveActivitySecondaryAction(options);
 
         const response = await client.liveActivities.updateLiveActivity({
-          liveActivityUpdateRequest: withTags(toApiLiveActivityUpdateRequest(
+          liveActivityUpdateRequest: withSound(withTags(toApiLiveActivityUpdateRequest(
             options.activityId,
             contentState,
             action,
             secondaryAction
-          ), options.clearTags ? [] : options.tags, await loadMetadata(options)),
+          ), options.clearTags ? [] : options.tags, await loadMetadata(options)), options.sound),
         });
 
         outputResult(response, globalOptions, [
@@ -1712,6 +1804,7 @@ addLiveActivityActionOptions(addContentStateOptions(
     .requiredOption("--activity-id <id>", "Live Activity ID")
     .option("--tags <tags>", "Replace Tags for this Live Activity (repeatable)", parseTagsOption)
     .option("--clear-tags", "Remove all Tags from this Live Activity")
+    .option("--sound <name>", LIVE_ACTIVITY_CHANGE_SOUND_HELP, parseSoundOption)
     .option("--metadata <json>", "Metadata JSON object shown in ActivitySmith details")
     .option("--metadata-file <path>", "Path to a Metadata JSON object file")
     .action(async (options) => {
@@ -1728,12 +1821,12 @@ addLiveActivityActionOptions(addContentStateOptions(
         const secondaryAction = await loadLiveActivitySecondaryAction(options);
 
         const response = await client.liveActivities.endLiveActivity({
-          liveActivityEndRequest: withTags(toApiLiveActivityEndRequest(
+          liveActivityEndRequest: withSound(withTags(toApiLiveActivityEndRequest(
             options.activityId,
             contentState,
             action,
             secondaryAction
-          ), options.clearTags ? [] : options.tags, await loadMetadata(options)),
+          ), options.clearTags ? [] : options.tags, await loadMetadata(options)), options.sound),
         });
 
         outputResult(response, globalOptions, [
@@ -1754,6 +1847,7 @@ addLiveActivityActionOptions(addContentStateOptions(
     .argument("<stream-key>", "Stable stream key")
     .option("--tags <tags>", "Comma-separated Tags", parseTagsOption)
     .option("--clear-tags", "Clear existing Tags")
+    .option("--sound <name>", LIVE_ACTIVITY_CHANGE_SOUND_HELP, parseSoundOption)
     .option("--metadata <json>", "Metadata as a JSON object")
     .option("--metadata-file <path>", "Metadata JSON file path")
     .action(async (streamKey, options) => {
@@ -1772,7 +1866,8 @@ addLiveActivityActionOptions(addContentStateOptions(
         const request =
           contentState !== undefined ||
           action !== undefined ||
-          secondaryAction !== undefined || tags !== undefined || metadata !== undefined
+          secondaryAction !== undefined || tags !== undefined || metadata !== undefined ||
+          options.sound !== undefined
             ? toApiLiveActivityStreamDeleteRequest(
                 contentState,
                 action,
@@ -1782,6 +1877,7 @@ addLiveActivityActionOptions(addContentStateOptions(
 
         if (tags !== undefined) request.tags = tags;
         if (metadata !== undefined) request.metadata = metadata;
+        if (options.sound !== undefined) request.sound = options.sound;
         const response = await client.liveActivities.endStream(streamKey, request);
 
         const activityId = response?.activityId ?? response?.activity_id;
