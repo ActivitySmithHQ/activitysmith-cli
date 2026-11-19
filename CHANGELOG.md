@@ -1,3 +1,7 @@
+## 1.21.0
+
+Adds `--sound` to `push` and to every `activity` command. Pass one of the 30 sounds bundled with the ActivitySmith app, such as `--sound coin`, `default` for the sound picked in the app, or `none` for no sound.
+
 ## 1.20.1
 
 Approval requests with `--git-changes` now show a simpler summary of your changes: how many files changed, the lines added and removed, and the 2 most changed files.
