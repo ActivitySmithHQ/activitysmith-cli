@@ -139,7 +139,7 @@ const parseSoundOption = (value) => {
 };
 
 const SOUND_HELP = "Sound to play: a bundled sound name, default, or none";
-const LIVE_ACTIVITY_CHANGE_SOUND_HELP = `${SOUND_HELP}. Silent by default; a sound also expands the Live Activity on the Lock Screen`;
+const LIVE_ACTIVITY_CHANGE_SOUND_HELP = `${SOUND_HELP}. Silent by default; iOS plays the sound only while the screen is on`;
 
 const withSound = (request, sound) => (sound === undefined ? request : { ...request, sound });
 
@@ -1644,7 +1644,7 @@ addLiveActivityActionOptions(addContentStateOptions(
     .option("--clear-tags", "Remove all Tags from this stream")
     .option(
       "--sound <name>",
-      `${SOUND_HELP}. A new stream defaults to your Live Activities sound; updates are silent by default, and a sound also expands the Live Activity on the Lock Screen`,
+      `${SOUND_HELP}. A new stream defaults to your Live Activities sound; updates are silent by default, and iOS plays an update sound only while the screen is on`,
       parseSoundOption
     )
     .option("--metadata <json>", "Metadata JSON object shown in ActivitySmith details")
