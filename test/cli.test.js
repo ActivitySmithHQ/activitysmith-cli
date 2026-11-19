@@ -208,6 +208,59 @@ test("new countdown still requires a duration", async () => {
   assert.equal(result.request, null);
 });
 
+for (const mode of ["stream", "start"]) {
+  test(`timer ${mode} sends timer start and end dates`, async () => {
+    const args = ["activity", mode];
+    if (mode === "stream") args.push("job");
+    args.push("--title", "Job", "--type", "timer",
+      "--timer-start-at", "2026-11-19T10:00:00+07:00",
+      "--timer-end-at", "2026-11-19T03:30:00Z");
+    const result = await runCli(args);
+    assert.equal(result.code, 0, result.stderr);
+    const state = result.request.body.content_state;
+    assert.equal(state.timer_start_at, "2026-11-19T03:00:00.000Z");
+    assert.equal(state.timer_end_at, "2026-11-19T03:30:00.000Z");
+    assert.equal(state.timerStartAt, undefined);
+    assert.equal(state.timerEndAt, undefined);
+    assert.equal(state.duration_seconds, undefined);
+  });
+}
+
+test("timer end date alone satisfies a new countdown", async () => {
+  const result = await runCli(["activity", "start", "--title", "Job", "--type", "timer",
+    "--timer-end-at", "2026-11-19T03:30:00Z"]);
+  assert.equal(result.code, 0, result.stderr);
+  assert.equal(result.request.body.content_state.timer_end_at, "2026-11-19T03:30:00.000Z");
+});
+
+test("content state JSON accepts camelCase timer dates", async () => {
+  const result = await runCli(["activity", "start", "--content-state", JSON.stringify({
+    title: "Job", type: "timer", timerStartAt: "2026-11-19T03:00:00Z", timerEndAt: "2026-11-19T03:30:00Z" })]);
+  assert.equal(result.code, 0, result.stderr);
+  assert.equal(result.request.body.content_state.timer_start_at, "2026-11-19T03:00:00.000Z");
+  assert.equal(result.request.body.content_state.timer_end_at, "2026-11-19T03:30:00.000Z");
+});
+
+test("rejects duration seconds with a timer end date", async () => {
+  const result = await runCli(["activity", "stream", "job", "--title", "Job", "--type", "timer",
+    "--duration-seconds", "60", "--timer-end-at", "2026-11-19T03:30:00Z"]);
+  assert.notEqual(result.code, 0);
+  assert.match(result.stdout + result.stderr, /durationSeconds or contentState\.timerEndAt, not both/);
+  assert.equal(result.request, null);
+});
+
+for (const [form, args] of [
+  ["flag", ["--title", "Job", "--type", "timer", "--timer-end-at", "not-a-date"]],
+  ["JSON", ["--content-state", JSON.stringify({ title: "Job", type: "timer", timerStartAt: "soon" })]],
+]) {
+  test(`rejects an invalid timer date via ${form}`, async () => {
+    const result = await runCli(["activity", "stream", "job", ...args]);
+    assert.notEqual(result.code, 0);
+    assert.match(result.stdout + result.stderr, /must be an ISO 8601 date-time/);
+    assert.equal(result.request, null);
+  });
+}
+
 test("rejects negative dismissal seconds before sending", async () => {
   const result = await runCli(["activity", "end-stream", "job", "--title", "Done",
     "--type", "timer", "--auto-dismiss-seconds", "-1"]);

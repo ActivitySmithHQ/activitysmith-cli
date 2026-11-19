@@ -73,6 +73,13 @@ const parseNumberOption = (label) => (value) => {
   return parsed;
 };
 
+const parseDateOption = (label) => (value) => {
+  if (typeof value !== "string" || Number.isNaN(Date.parse(value))) {
+    throw new InvalidArgumentError(`${label} must be an ISO 8601 date-time`);
+  }
+  return new Date(value).toISOString();
+};
+
 const parseBooleanOption = (label) => (value) => {
   if (typeof value !== "string") {
     throw new InvalidArgumentError(`${label} must be true or false`);
@@ -266,6 +273,16 @@ const addContentStateOptions = (command, { includeAutoDismiss, includeAutoDismis
       parseNumberOption("duration-seconds")
     )
     .option(
+      "--timer-start-at <date>",
+      "Timer start time as an ISO 8601 date-time",
+      parseDateOption("timer-start-at")
+    )
+    .option(
+      "--timer-end-at <date>",
+      "Timer end time as an ISO 8601 date-time (instead of --duration-seconds)",
+      parseDateOption("timer-end-at")
+    )
+    .option(
       "--counts-down <boolean>",
       "Set to false for an elapsed timer",
       parseBooleanOption("counts-down")
@@ -455,7 +472,27 @@ const validateContentState = (contentState, mode) => {
   const hasMetrics = hasOwn(contentState, "metrics");
   const hasDurationSeconds = hasOwn(contentState, "durationSeconds");
   const hasCountsDown = hasOwn(contentState, "countsDown");
-  const hasTimerFields = hasDurationSeconds || hasCountsDown;
+  const hasTimerStartAt =
+    hasOwn(contentState, "timerStartAt") || hasOwn(contentState, "timer_start_at");
+  const hasTimerEndAt =
+    hasOwn(contentState, "timerEndAt") || hasOwn(contentState, "timer_end_at");
+  const hasTimerFields =
+    hasDurationSeconds || hasCountsDown || hasTimerStartAt || hasTimerEndAt;
+
+  for (const key of ["timerStartAt", "timer_start_at", "timerEndAt", "timer_end_at"]) {
+    if (!hasOwn(contentState, key)) continue;
+    const value = contentState[key];
+    if (typeof value !== "string" || Number.isNaN(Date.parse(value))) {
+      throw new Error(`contentState.${key} must be an ISO 8601 date-time`);
+    }
+    contentState[key] = new Date(value).toISOString();
+  }
+
+  if (hasDurationSeconds && hasTimerEndAt) {
+    throw new Error(
+      "Provide either contentState.durationSeconds or contentState.timerEndAt, not both"
+    );
+  }
 
   for (const key of ["autoDismissSeconds", "auto_dismiss_seconds"]) {
     if (hasOwn(contentState, key) &&
@@ -638,9 +675,14 @@ const validateContentState = (contentState, mode) => {
     }
 
     if (effectiveType === "timer") {
-      if (mode === "start" && !hasDurationSeconds && contentState.countsDown !== false) {
+      if (
+        mode === "start" &&
+        !hasDurationSeconds &&
+        !hasTimerEndAt &&
+        contentState.countsDown !== false
+      ) {
         throw new Error(
-          `timer ${mode} requires contentState.durationSeconds, or contentState.countsDown=false`
+          `timer ${mode} requires contentState.durationSeconds or contentState.timerEndAt, or contentState.countsDown=false`
         );
       }
       return;
@@ -921,6 +963,14 @@ const buildContentStateFromOptions = (options) => {
     contentState.durationSeconds = options.durationSeconds;
   }
 
+  if (options.timerStartAt !== undefined) {
+    contentState.timerStartAt = options.timerStartAt;
+  }
+
+  if (options.timerEndAt !== undefined) {
+    contentState.timerEndAt = options.timerEndAt;
+  }
+
   if (options.countsDown !== undefined) {
     contentState.countsDown = options.countsDown;
   }
@@ -970,6 +1020,8 @@ const toApiContentState = (contentState) => {
     autoDismissSeconds: "auto_dismiss_seconds",
     durationSeconds: "duration_seconds",
     countsDown: "counts_down",
+    timerStartAt: "timer_start_at",
+    timerEndAt: "timer_end_at",
   };
 
   const mapped = {};
